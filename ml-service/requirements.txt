@@ -1,4 +1,4 @@
-flask>=3.0.0
+git commit -m "fix(ml-service): update requirements.txt to fix python package installation on windows"flask>=3.0.0
 flask-cors>=4.0.0
 pandas>=2.0.0
 numpy>=1.26.0
