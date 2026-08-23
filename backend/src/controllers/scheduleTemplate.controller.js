@@ -89,6 +89,9 @@ const generateSchedules = async (req, res) => {
           ticketPrice: template.ticketPrice,
           availableSeats: template.availableSeats,
           sourceTemplateId: template.id,
+          poolOrigin: template.poolOrigin || null,
+          poolDestination: template.poolDestination || null,
+          imageUrl: template.imageUrl || null,
           isTemplate: false,
           isActive: true
         });
@@ -325,7 +328,10 @@ const createTemplate = async (req, res) => {
       departureTime,
       ticketPrice,
       recurringType,
-      recurringDays
+      recurringDays,
+      poolOrigin,
+      poolDestination,
+      imageUrl
     } = req.body;
 
     // Validation
@@ -364,6 +370,9 @@ const createTemplate = async (req, res) => {
         isTemplate: true,
         recurringType,
         recurringDays: recurringDays || null,
+        poolOrigin: poolOrigin || null,
+        poolDestination: poolDestination || null,
+        imageUrl: imageUrl || null,
         isActive: true
       },
       include: {
@@ -409,6 +418,9 @@ const updateTemplate = async (req, res) => {
       ticketPrice,
       recurringType,
       recurringDays,
+      poolOrigin,
+      poolDestination,
+      imageUrl,
       isActive
     } = req.body;
 
@@ -447,6 +459,9 @@ const updateTemplate = async (req, res) => {
         availableSeats,
         recurringType: recurringType || existingTemplate.recurringType,
         recurringDays: recurringDays !== undefined ? recurringDays : existingTemplate.recurringDays,
+        poolOrigin: poolOrigin !== undefined ? poolOrigin : existingTemplate.poolOrigin,
+        poolDestination: poolDestination !== undefined ? poolDestination : existingTemplate.poolDestination,
+        imageUrl: imageUrl !== undefined ? imageUrl : existingTemplate.imageUrl,
         isActive: isActive !== undefined ? isActive : existingTemplate.isActive
       },
       include: {
@@ -521,11 +536,47 @@ const deleteTemplate = async (req, res) => {
   }
 };
 
+// Public endpoint: Get active template schedules for public landing page
+const getPublicTemplates = async (req, res) => {
+  try {
+    const templates = await prisma.schedule.findMany({
+      where: {
+        isTemplate: true,
+        isActive: true
+      },
+      include: {
+        route: {
+          include: {
+            originCity: true,
+            destinationCity: true
+          }
+        },
+        vehicle: true
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    res.json({
+      success: true,
+      data: templates
+    });
+  } catch (error) {
+    console.error('Get public templates error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal mengambil rute template'
+    });
+  }
+};
+
 module.exports = {
   generateSchedules,
   getTemplates,
   getTemplateById,
   createTemplate,
   updateTemplate,
-  deleteTemplate
+  deleteTemplate,
+  getPublicTemplates
 };

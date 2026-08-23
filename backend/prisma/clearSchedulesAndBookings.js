@@ -4,28 +4,25 @@ const prisma = new PrismaClient();
 
 async function clearData() {
   try {
-    console.log('🗑️  Memulai penghapusan data...\n');
+    console.log('🗑️  Memulai penghapusan data tabel Booking dan Jadwal Perjalanan...\n');
 
-    // Delete bookings first (foreign key constraint)
-    console.log('📋 Menghapus semua bookings...');
+    // 1. Delete all bookings
+    console.log('📋 Menghapus semua data Booking & Pembayaran...');
     const deletedBookings = await prisma.booking.deleteMany({});
-    console.log(`✅ ${deletedBookings.count} bookings berhasil dihapus\n`);
+    console.log(`✅ ${deletedBookings.count} data booking berhasil dihapus.\n`);
 
-    // Delete only real schedules (keep templates)
-    console.log('📅 Menghapus semua jadwal perjalanan (non-template)...');
-    const deletedSchedules = await prisma.schedule.deleteMany({
-      where: {
-        isTemplate: false
-      }
-    });
-    console.log(`✅ ${deletedSchedules.count} jadwal berhasil dihapus\n`);
+    // 2. Delete all schedules (both template and generated schedules)
+    console.log('📅 Menghapus semua data Jadwal Perjalanan...');
+    const deletedSchedules = await prisma.schedule.deleteMany({});
+    console.log(`✅ ${deletedSchedules.count} data jadwal perjalanan berhasil dihapus.\n`);
 
-    console.log('🎉 Selesai! Data berhasil dibersihkan.');
+    console.log('🎉 Selesai! Data tabel booking, pembayaran, dan jadwal perjalanan berhasil dibersihkan.');
   } catch (error) {
-    console.error('❌ Error:', error.message);
+    console.error('❌ Error saat menghapus data:', error.message);
   } finally {
     await prisma.$disconnect();
   }
 }
 
 clearData();
+

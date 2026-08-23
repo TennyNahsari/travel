@@ -20,8 +20,11 @@ router.get('/dropdown/drivers', scheduleController.getAvailableDrivers);
 // Create schedule (only ADMIN and OPERATOR)
 router.post('/', roleMiddleware(['ADMIN', 'OPERATOR']), scheduleController.createSchedule);
 
-// Update schedule (only ADMIN and OPERATOR)
+// Update schedule details (only ADMIN and OPERATOR)
 router.put('/:id', roleMiddleware(['ADMIN', 'OPERATOR']), scheduleController.updateSchedule);
+
+// Update schedule status (ADMIN, OPERATOR, DRIVER)
+router.put('/:id/status', roleMiddleware(['ADMIN', 'OPERATOR', 'DRIVER']), scheduleController.updateScheduleStatus);
 
 // Delete schedule (only ADMIN and OPERATOR)
 router.delete('/:id', roleMiddleware(['ADMIN', 'OPERATOR']), scheduleController.deleteSchedule);

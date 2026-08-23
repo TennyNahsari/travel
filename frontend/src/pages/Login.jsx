@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { authService } from '../services/api';
 
 function Login({ setUser }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
@@ -17,7 +18,8 @@ function Login({ setUser }) {
     try {
       const response = await authService.login(email, password);
       setUser(response.user);
-      navigate('/dashboard');
+      const redirectPath = location.state?.from || '/dashboard';
+      navigate(redirectPath, { state: location.state });
     } catch (err) {
       setError(err.response?.data?.error || 'Login failed. Please try again.');
     } finally {

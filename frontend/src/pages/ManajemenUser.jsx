@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import api from '../services/api';
+import Pagination from '../components/Pagination';
 
 function ManajemenUser() {
   const { t } = useTranslation();
@@ -21,8 +22,11 @@ function ManajemenUser() {
   const [searchQuery, setSearchQuery] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(10);
 
   useEffect(() => {
+    setCurrentPage(1);
     fetchUsers();
     fetchStats();
   }, [filterRole, searchQuery]);
@@ -315,9 +319,9 @@ function ManajemenUser() {
                     </td>
                   </tr>
                 ) : (
-                  users.map((user, index) => (
+                  users.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((user, index) => (
                     <tr key={user.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm text-gray-800">{index + 1}</td>
+                      <td className="px-6 py-4 text-sm text-gray-800">{(currentPage - 1) * itemsPerPage + index + 1}</td>
                       <td className="px-6 py-4">
                         <div className="flex items-center">
                           <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
@@ -381,6 +385,14 @@ function ManajemenUser() {
               </tbody>
             </table>
           </div>
+        )}
+        {!loading && users.length > 0 && (
+          <Pagination
+            currentPage={currentPage}
+            totalItems={users.length}
+            itemsPerPage={itemsPerPage}
+            onPageChange={setCurrentPage}
+          />
         )}
       </div>
 

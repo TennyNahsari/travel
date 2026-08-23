@@ -104,87 +104,165 @@ async function main() {
     }
   });
 
+  const cirebon = await prisma.city.upsert({
+    where: { id: 'cirebon-id' },
+    update: {},
+    create: {
+      id: 'cirebon-id',
+      name: 'Cirebon',
+      province: 'Jawa Barat'
+    }
+  });
+
+  const semarang = await prisma.city.upsert({
+    where: { id: 'semarang-id' },
+    update: {},
+    create: {
+      id: 'semarang-id',
+      name: 'Semarang',
+      province: 'Jawa Tengah'
+    }
+  });
+
   console.log('✅ Cities created');
 
   // Create routes
   console.log('Creating routes...');
 
-  const route1 = await prisma.route.create({
-    data: {
-      originCityId: jakarta.id,
-      destinationCityId: bandung.id,
-      distance: 150,
-      estimatedTime: 180, // 3 hours
-      basePrice: 100000
+  const getOrCreateRoute = async (originCityId, destinationCityId, distance, estimatedTime, basePrice) => {
+    let r = await prisma.route.findFirst({
+      where: { originCityId, destinationCityId }
+    });
+    if (!r) {
+      r = await prisma.route.create({
+        data: { originCityId, destinationCityId, distance, estimatedTime, basePrice }
+      });
     }
-  });
+    return r;
+  };
 
-  const route2 = await prisma.route.create({
-    data: {
-      originCityId: jakarta.id,
-      destinationCityId: surabaya.id,
-      distance: 800,
-      estimatedTime: 720, // 12 hours
-      basePrice: 300000
-    }
-  });
-
-  const route3 = await prisma.route.create({
-    data: {
-      originCityId: bandung.id,
-      destinationCityId: yogyakarta.id,
-      distance: 400,
-      estimatedTime: 480, // 8 hours
-      basePrice: 200000
-    }
-  });
+  const route1 = await getOrCreateRoute(jakarta.id, bandung.id, 150, 180, 100000);
+  const route2 = await getOrCreateRoute(jakarta.id, surabaya.id, 800, 720, 300000);
+  const route3 = await getOrCreateRoute(bandung.id, yogyakarta.id, 400, 480, 200000);
+  const routeCrb = await getOrCreateRoute(jakarta.id, cirebon.id, 220, 210, 130000);
+  const routeSmg = await getOrCreateRoute(jakarta.id, semarang.id, 450, 360, 200000);
 
   console.log('✅ Routes created');
 
   // Create vehicles
   console.log('Creating vehicles...');
 
-  const vehicle1 = await prisma.vehicle.create({
-    data: {
-      plateNumber: 'B-1234-XYZ',
-      vehicleType: 'Hiace',
-      capacity: 14,
-      status: 'ACTIVE'
+  const getOrCreateVehicle = async (plateNumber, vehicleType, capacity, status = 'ACTIVE', description = null, facilities = null, imageUrl = null) => {
+    let v = await prisma.vehicle.findUnique({ where: { plateNumber } });
+    if (!v) {
+      v = await prisma.vehicle.create({
+        data: { plateNumber, vehicleType, capacity, status, description, facilities, imageUrl }
+      });
+    } else {
+      v = await prisma.vehicle.update({
+        where: { plateNumber },
+        data: { description, facilities, imageUrl }
+      });
     }
-  });
+    return v;
+  };
 
-  const vehicle2 = await prisma.vehicle.create({
-    data: {
-      plateNumber: 'B-5678-ABC',
-      vehicleType: 'Elf',
-      capacity: 16,
-      status: 'ACTIVE'
-    }
-  });
+  const vehicle1 = await getOrCreateVehicle(
+    'B-1234-XYZ',
+    'Toyota Hiace Premio Executive',
+    12,
+    'ACTIVE',
+    'Armada flagship mewah 12 kursi captain seat Reclining 1-1 dengan legroom lega, USB fast charger, Full AC, dan suspense empuk.',
+    ["Reclining Captain Seat", "USB Charging Port", "Full AC Premium", "WiFi Hi-Speed", "Bagasi Ekstra", "Air Minum Gratis"],
+    'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=800&q=80'
+  );
+  const vehicle2 = await getOrCreateVehicle(
+    'B-5678-ABC',
+    'Isuzu Elf Long Luxury',
+    16,
+    'ACTIVE',
+    'Armada kapasitas besar 16 kursi ekonomis-mewah dengan kabin tinggi, AC double blower dingin merata, dan peredam suara halus.',
+    ["Seat Reclining", "AC Double Blower", "USB Charger", "Sound System TV", "Bagasi Luas"],
+    'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80'
+  );
+  const vehicle3 = await getOrCreateVehicle('AB-9999-CD', 'Avanza Executive', 7, 'MAINTENANCE');
 
-  const vehicle3 = await prisma.vehicle.create({
-    data: {
-      plateNumber: 'AB-9999-CD',
-      vehicleType: 'Avanza',
-      capacity: 7,
-      status: 'MAINTENANCE'
-    }
-  });
-
-  console.log('✅ Vehicles created');
+  console.log('✅ Vehicles created with description and facilities');
 
   // Create driver
   console.log('Creating driver...');
 
-  const driver = await prisma.driver.create({
-    data: {
-      userId: driverUser.id,
-      licenseNumber: 'SIM-123456789',
-      status: 'ACTIVE'
-    }
+  let driver = await prisma.driver.findUnique({
+    where: { userId: driverUser.id }
   });
+  if (!driver) {
+    driver = await prisma.driver.create({
+      data: {
+        userId: driverUser.id,
+        licenseNumber: 'SIM-123456789',
+        status: 'ACTIVE'
+      }
+    });
+  }
 
   console.log('✅ Driver created');
+
+  // Create schedule templates
+  console.log('Creating schedule templates...');
+
+  const createTemplateIfNotExists = async (templateName, routeId, vehicleId, driverId, departureTime, ticketPrice, availableSeats, poolOrigin, poolDestination, imageUrl) => {
+    const existing = await prisma.schedule.findFirst({
+      where: { templateName, isTemplate: true }
+    });
+    if (!existing) {
+      await prisma.schedule.create({
+        data: {
+          templateName,
+          routeId,
+          vehicleId,
+          driverId,
+          departureDate: new Date('2026-01-01'),
+          departureTime,
+          ticketPrice,
+          availableSeats,
+          poolOrigin,
+          poolDestination,
+          imageUrl,
+          isTemplate: true,
+          isActive: true,
+          recurringType: 'DAILY'
+        }
+      });
+    } else {
+      // Update existing template with pool & image info
+      await prisma.schedule.update({
+        where: { id: existing.id },
+        data: { poolOrigin, poolDestination, imageUrl }
+      });
+    }
+  };
+
+  await createTemplateIfNotExists('Rute Pagi JKT-BDG', route1.id, vehicle1.id, driver.id, '08:00', 120000, 14, 'Pool Semanggi / Lebak Bulus', 'Pool Pasteur / Dipatiukur', 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80');
+  await createTemplateIfNotExists('Rute Pagi JKT-CRB', routeCrb.id, vehicle1.id, driver.id, '09:00', 150000, 14, 'Pool Semanggi / Pulo Gebang', 'Pool Cirebon Superblock (CSB)', 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=800&q=80');
+  await createTemplateIfNotExists('Trans-Jawa JKT-SMG', routeSmg.id, vehicle2.id, driver.id, '07:00', 230000, 16, 'Pool Lebak Bulus', 'Pool Simpang Lima Semarang', 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=800&q=80');
+
+  console.log('✅ Schedule templates created/updated');
+
+  // Update existing active schedules with pool & image info if missing
+  await prisma.schedule.updateMany({
+    where: { routeId: route1.id, isTemplate: false },
+    data: { poolOrigin: 'Pool Semanggi / Lebak Bulus', poolDestination: 'Pool Pasteur / Dipatiukur', imageUrl: 'https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80' }
+  });
+
+  await prisma.schedule.updateMany({
+    where: { routeId: routeCrb.id, isTemplate: false },
+    data: { poolOrigin: 'Pool Semanggi / Pulo Gebang', poolDestination: 'Pool Cirebon Superblock (CSB)', imageUrl: 'https://images.unsplash.com/photo-1570125909232-eb263c188f7e?auto=format&fit=crop&w=800&q=80' }
+  });
+
+  await prisma.schedule.updateMany({
+    where: { routeId: routeSmg.id, isTemplate: false },
+    data: { poolOrigin: 'Pool Lebak Bulus', poolDestination: 'Pool Simpang Lima Semarang', imageUrl: 'https://images.unsplash.com/photo-1596402184320-417e7178b2cd?auto=format&fit=crop&w=800&q=80' }
+  });
 
   // Create schedules
   console.log('Creating schedules...');

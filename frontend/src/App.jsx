@@ -1,5 +1,6 @@
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import LandingPage from './pages/LandingPage';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import MasterKota from './pages/MasterKota';
@@ -23,6 +24,7 @@ function App() {
   return (
     <Router>
       <Routes>
+        <Route path="/" element={<LandingPage />} />
         <Route path="/login" element={<Login setUser={setUser} />} />
         <Route 
           path="/dashboard" 
@@ -120,7 +122,6 @@ function App() {
             </ProtectedRoute>
           } 
         />
-        <Route path="/" element={<Navigate to="/dashboard" />} />
       </Routes>
     </Router>
   );

@@ -9,9 +9,6 @@ const getPayments = async (req, res) => {
     const where = {
       status: {
         in: ['PAID', 'CONFIRMED']
-      },
-      paidAt: {
-        not: null
       }
     };
     
@@ -90,9 +87,6 @@ const getPaymentStats = async (req, res) => {
     const where = {
       status: {
         in: ['PAID', 'CONFIRMED']
-      },
-      paidAt: {
-        not: null
       }
     };
     

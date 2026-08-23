@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
 import api, { authService } from '../services/api';
 import Pagination from '../components/Pagination';
 
@@ -12,6 +13,7 @@ const getRowSeats = (rowIndex, rowsConfig) => {
 
 function BookingTiket() {
   const { t } = useTranslation();
+  const location = useLocation();
   const [bookings, setBookings] = useState([]);
   const [schedules, setSchedules] = useState([]);
   const [availableSeats, setAvailableSeats] = useState([]);
@@ -24,9 +26,15 @@ function BookingTiket() {
   const [currentBooking, setCurrentBooking] = useState({
     scheduleId: '',
     seatNumbers: [],
-    userId: ''
+    userId: '',
+    passengerName: '',
+    passengerPhone: '',
+    passengerEmail: '',
+    passengerNik: ''
   });
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+  const [scheduleSearchQuery, setScheduleSearchQuery] = useState('');
+  const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
   const [filterStatus, setFilterStatus] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -37,6 +45,58 @@ function BookingTiket() {
   useEffect(() => {
     fetchBookings();
   }, [filterStatus]);
+
+  useEffect(() => {
+    if (location.state?.openModal) {
+      const autoOpenBooking = async () => {
+        try {
+          const response = await api.get('/bookings/schedules/available');
+          const loadedSchedules = response.data.data || [];
+          setSchedules(loadedSchedules);
+
+          const targetOrigin = (location.state?.origin || '').toLowerCase();
+          const targetDest = (location.state?.destination || '').toLowerCase();
+
+          let matchedSchedule = null;
+          if (targetOrigin && targetDest) {
+            matchedSchedule = loadedSchedules.find((s) => {
+              const origName = (s.route?.originCity?.name || '').toLowerCase();
+              const destName = (s.route?.destinationCity?.name || '').toLowerCase();
+              return (
+                (origName.includes(targetOrigin) || targetOrigin.includes(origName)) &&
+                (destName.includes(targetDest) || targetDest.includes(destName))
+              );
+            });
+          }
+
+          const initSchedule = matchedSchedule || (loadedSchedules.length > 0 ? loadedSchedules[0] : null);
+
+          setCurrentBooking({
+            scheduleId: initSchedule ? initSchedule.id : '',
+            seatNumbers: [],
+            userId: currentUser?.id || '',
+            passengerName: currentUser?.name || '',
+            passengerPhone: currentUser?.phone || '',
+            passengerEmail: currentUser?.email || '',
+            passengerNik: ''
+          });
+
+          if (initSchedule) {
+            setSelectedSchedule(initSchedule);
+            await fetchAvailableSeats(initSchedule.id);
+          } else {
+            setSelectedSchedule(null);
+          }
+
+          setShowModal(true);
+        } catch (err) {
+          console.error('Error auto opening booking modal:', err);
+        }
+      };
+
+      autoOpenBooking();
+    }
+  }, [location.state]);
 
   const fetchBookings = async () => {
     try {
@@ -67,9 +127,12 @@ function BookingTiket() {
     try {
       const response = await api.get(`/bookings/schedules/${scheduleId}/seats`);
       setAvailableSeats(response.data.data);
-      // Set selectedSchedule from response if available
       if (response.data.data.schedule) {
-        setSelectedSchedule(response.data.data.schedule);
+        setSelectedSchedule((prev) => ({
+          ...prev,
+          ...response.data.data.schedule,
+          route: response.data.data.schedule.route || prev?.route
+        }));
       }
     } catch (err) {
       console.error('Gagal mengambil kursi tersedia:', err);
@@ -81,9 +144,15 @@ function BookingTiket() {
     setCurrentBooking({
       scheduleId: '',
       seatNumbers: [],
-      userId: currentUser.role === 'CUSTOMER' ? currentUser.id : ''
+      userId: currentUser?.id || '',
+      passengerName: '',
+      passengerPhone: '',
+      passengerEmail: '',
+      passengerNik: ''
     });
     setSelectedSchedule(null);
+    setScheduleSearchQuery('');
+    setIsScheduleDropdownOpen(false);
     setShowModal(true);
     setError('');
     setSuccess('');
@@ -130,27 +199,18 @@ function BookingTiket() {
 
     try {
       const response = await api.post('/bookings', currentBooking);
-      const booking = response.data.data;
-      
-      // Save booking info and show payment modal
-      setCreatedBookingInfo({
-        bookingCode: booking.bookingCode,
-        totalAmount: booking.totalAmount,
-        seatNumbers: booking.seatNumbers,
-        schedule: selectedSchedule
-      });
       
       setSuccess(t('booking.createSuccess'));
       fetchBookings();
       
-      // Close booking modal and show payment info
+      // Close booking modal
       setShowModal(false);
       setShowSeatModal(false);
+      setIsScheduleDropdownOpen(false);
       
       setTimeout(() => {
-        setShowPaymentInfo(true);
         setSuccess('');
-      }, 500);
+      }, 3000);
     } catch (err) {
       setError(err.response?.data?.error || t('booking.saveError'));
     }
@@ -196,6 +256,20 @@ function BookingTiket() {
     }
   };
 
+  const handleDeleteBooking = async (bookingId, bookingCode) => {
+    if (window.confirm(`Apakah Anda yakin ingin menghapus data booking ${bookingCode} ini secara permanen?`)) {
+      try {
+        await api.delete(`/bookings/${bookingId}`);
+        setSuccess(`Data booking ${bookingCode} berhasil dihapus permanen.`);
+        fetchBookings();
+        setTimeout(() => setSuccess(''), 3000);
+      } catch (err) {
+        setError(err.response?.data?.error || 'Gagal menghapus data booking');
+        setTimeout(() => setError(''), 3000);
+      }
+    }
+  };
+
   const getStatusBadge = (status) => {
     const badges = {
       PENDING: 'bg-yellow-100 text-yellow-800',
@@ -212,7 +286,7 @@ function BookingTiket() {
 
   const formatDate = (dateString) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('id-ID', {
+    return date.toLocaleDateString(t('common.locale') || 'id-ID', {
       weekday: 'short',
       year: 'numeric',
       month: 'short',
@@ -221,11 +295,13 @@ function BookingTiket() {
   };
 
   const formatCurrency = (amount) => {
+    const num = Number(amount);
+    if (isNaN(num)) return 'Rp 0';
     return new Intl.NumberFormat('id-ID', {
       style: 'currency',
       currency: 'IDR',
       minimumFractionDigits: 0
-    }).format(amount);
+    }).format(num);
   };
 
   const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'OPERATOR';
@@ -328,17 +404,26 @@ function BookingTiket() {
                         </div>
                       </td>
                       <td className="px-6 py-4">
-                        {isAdmin ? (
-                          <div>
-                            <div className="text-sm font-medium text-gray-800">{booking.user.name}</div>
-                            <div className="text-xs text-gray-500">{booking.user.email}</div>
+                        <div>
+                          <div className="text-sm font-bold text-gray-800">
+                            {booking.passengerName || booking.user?.name || 'N/A'}
                           </div>
-                        ) : (
-                          <div>
-                            <div className="text-sm text-gray-800">{booking.schedule.vehicle.vehicleType}</div>
-                            <div className="text-xs text-gray-500">{booking.schedule.vehicle.plateNumber}</div>
-                          </div>
-                        )}
+                          {booking.passengerPhone && (
+                            <div className="text-xs text-gray-600">
+                              📱 {booking.passengerPhone}
+                            </div>
+                          )}
+                          {booking.passengerNik && (
+                            <div className="text-xs text-blue-600 font-mono font-semibold">
+                              🪪 NIK: {booking.passengerNik}
+                            </div>
+                          )}
+                          {booking.passengerEmail && (
+                            <div className="text-[11px] text-gray-400">
+                              ✉️ {booking.passengerEmail}
+                            </div>
+                          )}
+                        </div>
                       </td>
                       <td className="px-6 py-4">
                         <div className="text-sm font-medium text-gray-800">
@@ -381,23 +466,15 @@ function BookingTiket() {
                               {t('booking.viewPaymentInfo')}
                             </button>
                           )}
-                          {isAdmin && booking.status === 'PENDING' && (
+                          {isAdmin && (booking.status === 'PENDING' || booking.status === 'PAID') && (
                             <button
                               onClick={() => {
                                 const method = prompt(t('booking.enterPaymentMethod'));
-                                if (method) handleUpdateStatus(booking.id, 'PAID', method);
+                                if (method) handleUpdateStatus(booking.id, 'CONFIRMED', method);
                               }}
                               className="text-green-600 hover:text-green-800 font-medium text-left"
                             >
                               {t('booking.confirmPayment')}
-                            </button>
-                          )}
-                          {isAdmin && booking.status === 'PAID' && (
-                            <button
-                              onClick={() => handleUpdateStatus(booking.id, 'CONFIRMED')}
-                              className="text-blue-600 hover:text-blue-800 font-medium text-left"
-                            >
-                              {t('booking.confirm')}
                             </button>
                           )}
                           {booking.status === 'PENDING' && (
@@ -406,6 +483,17 @@ function BookingTiket() {
                               className="text-red-600 hover:text-red-800 font-medium text-left"
                             >
                               {t('booking.cancel')}
+                            </button>
+                          )}
+                          {isAdmin && (
+                            <button
+                              onClick={() => handleDeleteBooking(booking.id, booking.bookingCode)}
+                              className="text-red-600 hover:text-red-800 font-medium text-left flex items-center gap-1 text-xs mt-1"
+                            >
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                              </svg>
+                              {t('common.deletePermanent', 'Hapus Permanen')}
                             </button>
                           )}
                         </div>
@@ -450,12 +538,12 @@ function BookingTiket() {
 
                     {/* Details Grid */}
                     <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-                      {isAdmin && (
-                        <div>
-                          <span className="text-gray-500">{t('booking.customer')}:</span>
-                          <p className="font-medium text-gray-800">{booking.user.name}</p>
-                        </div>
-                      )}
+                      <div className="col-span-2 bg-slate-50 p-2 rounded-lg">
+                        <span className="text-gray-500 font-bold">Penumpang:</span>
+                        <p className="font-bold text-gray-800 text-sm">{booking.passengerName || booking.user?.name || 'N/A'}</p>
+                        {booking.passengerPhone && <p className="text-gray-600">📱 WA: {booking.passengerPhone}</p>}
+                        {booking.passengerNik && <p className="text-blue-600 font-mono font-semibold">🪪 NIK: {booking.passengerNik}</p>}
+                      </div>
                       <div>
                         <span className="text-gray-500">{t('booking.seat')}:</span>
                         <p className="font-medium text-gray-800">{booking.seatNumbers.join(', ')}</p>
@@ -485,31 +573,34 @@ function BookingTiket() {
                           {t('booking.viewPaymentInfo')}
                         </button>
                       )}
-                      {isAdmin && booking.status === 'PENDING' && (
+                      {isAdmin && (booking.status === 'PENDING' || booking.status === 'PAID') && (
                         <button
                           onClick={() => {
                             const method = prompt(t('booking.enterPaymentMethod'));
-                            if (method) handleUpdateStatus(booking.id, 'PAID', method);
+                            if (method) handleUpdateStatus(booking.id, 'CONFIRMED', method);
                           }}
                           className="flex-1 min-w-[120px] text-xs bg-green-50 text-green-600 hover:bg-green-100 px-3 py-2 rounded-lg font-medium transition"
                         >
                           {t('booking.confirmPayment')}
                         </button>
                       )}
-                      {isAdmin && booking.status === 'PAID' && (
-                        <button
-                          onClick={() => handleUpdateStatus(booking.id, 'CONFIRMED')}
-                          className="flex-1 min-w-[120px] text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-2 rounded-lg font-medium transition"
-                        >
-                          {t('booking.confirm')}
-                        </button>
-                      )}
                       {booking.status === 'PENDING' && (
                         <button
                           onClick={() => handleCancelBooking(booking.id, booking.bookingCode)}
-                          className="flex-1 min-w-[120px] text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-medium transition"
+                          className="flex-1 min-w-[120px] text-xs bg-amber-50 text-amber-600 hover:bg-amber-100 px-3 py-2 rounded-lg font-medium transition"
                         >
                           {t('booking.cancel')}
+                        </button>
+                      )}
+                      {isAdmin && (
+                        <button
+                          onClick={() => handleDeleteBooking(booking.id, booking.bookingCode)}
+                          className="flex-1 min-w-[120px] text-xs bg-red-50 text-red-600 hover:bg-red-100 px-3 py-2 rounded-lg font-medium transition flex items-center justify-center gap-1"
+                        >
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                          Hapus
                         </button>
                       )}
                     </div>
@@ -532,10 +623,29 @@ function BookingTiket() {
 
       {/* Booking Modal */}
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
+        <div 
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-2 sm:p-4 animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowModal(false);
+              setIsScheduleDropdownOpen(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[95vh] sm:max-h-[90vh] overflow-y-auto relative">
+            <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-20 flex items-center justify-between">
               <h2 className="text-xl font-bold text-gray-800">{t('booking.newBooking')}</h2>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowModal(false);
+                  setIsScheduleDropdownOpen(false);
+                }}
+                className="text-gray-400 hover:text-gray-700 bg-gray-100 hover:bg-gray-200 w-8 h-8 rounded-full flex items-center justify-center font-bold text-base transition cursor-pointer"
+                aria-label="Close modal"
+              >
+                ✕
+              </button>
             </div>
 
             <form onSubmit={handleSubmitBooking} className="p-6">
@@ -550,19 +660,139 @@ function BookingTiket() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     {t('booking.selectSchedule')} *
                   </label>
-                  <select
-                    value={currentBooking.scheduleId}
-                    onChange={(e) => handleScheduleSelect(e.target.value)}
-                    required
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                  >
-                    <option value="">{t('booking.availableSchedules')}</option>
-                    {schedules.map((schedule) => (
-                      <option key={schedule.id} value={schedule.id}>
-                        {schedule.route?.originCity?.name || 'N/A'} → {schedule.route?.destinationCity?.name || 'N/A'} | {formatDate(schedule.departureDate)} {schedule.departureTime} | {schedule.vehicle?.vehicleType || 'N/A'} | {t('booking.seat')}: {schedule.availableSeats}/{schedule.vehicle?.capacity || 0} | {formatCurrency(schedule.ticketPrice)}
-                      </option>
-                    ))}
-                  </select>
+                {/* Search Autocomplete Jadwal */}
+                <div className="relative">
+                  <label className="block text-sm font-bold text-gray-800 mb-1.5 flex items-center justify-between">
+                    <span>Cari & Pilih Jadwal Perjalanan *</span>
+                    {selectedSchedule && (
+                      <span className="text-xs font-bold text-green-700 bg-green-100 px-2.5 py-0.5 rounded-full flex items-center gap-1">
+                        <span>✓</span> Terpilih
+                      </span>
+                    )}
+                  </label>
+                  
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={scheduleSearchQuery}
+                      onChange={(e) => {
+                        setScheduleSearchQuery(e.target.value);
+                        setIsScheduleDropdownOpen(true);
+                      }}
+                      onFocus={() => setIsScheduleDropdownOpen(true)}
+                      placeholder={t('booking.searchSchedulePlaceholder', '🔎 Ketik rute, jam, atau armada...')}
+                      className="w-full pl-4 pr-10 py-2.5 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm outline-none shadow-sm font-medium transition"
+                    />
+
+                    {scheduleSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScheduleSearchQuery('');
+                          setSelectedSchedule(null);
+                          setCurrentBooking({ ...currentBooking, scheduleId: '', seatNumbers: [] });
+                          setIsScheduleDropdownOpen(true);
+                        }}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 bg-gray-100 hover:bg-gray-200 w-6 h-6 rounded-full flex items-center justify-center font-bold text-xs"
+                        aria-label="Clear schedule search"
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Autocomplete Suggestions Popup */}
+                  {isScheduleDropdownOpen && (
+                    <div className="absolute z-50 left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-2xl max-h-[380px] overflow-y-auto divide-y divide-gray-100 ring-1 ring-black ring-opacity-5">
+                      {schedules.length === 0 ? (
+                        <div className="p-4 text-center text-xs text-gray-500">
+                          {t('booking.noScheduleAvailable', 'Tidak ada jadwal yang tersedia saat ini.')}
+                        </div>
+                      ) : (() => {
+                        const filtered = schedules.filter((schedule) => {
+                          if (!scheduleSearchQuery.trim()) return true;
+                          const q = scheduleSearchQuery.toLowerCase();
+                          const origin = schedule.route?.originCity?.name?.toLowerCase() || '';
+                          const destination = schedule.route?.destinationCity?.name?.toLowerCase() || '';
+                          const vehicle = schedule.vehicle?.vehicleType?.toLowerCase() || '';
+                          const plate = schedule.vehicle?.plateNumber?.toLowerCase() || '';
+                          const time = schedule.departureTime?.toLowerCase() || '';
+                          const date = formatDate(schedule.departureDate)?.toLowerCase() || '';
+                          const price = schedule.ticketPrice?.toString() || '';
+                          return (
+                            origin.includes(q) ||
+                            destination.includes(q) ||
+                            vehicle.includes(q) ||
+                            plate.includes(q) ||
+                            time.includes(q) ||
+                            date.includes(q) ||
+                            price.includes(q)
+                          );
+                        });
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="p-4 text-center text-xs text-gray-500">
+                              {t('booking.noScheduleMatch', 'Tidak ada jadwal perjalanan yang sesuai.')}
+                            </div>
+                          );
+                        }
+
+                        return (
+                          <>
+                            <div className="px-3 py-1.5 bg-slate-100 text-[11px] font-bold text-slate-600 flex justify-between sticky top-0 z-10 border-b border-slate-200">
+                              <span>{t('booking.showingSchedulesCount', { count: filtered.length, total: schedules.length, defaultValue: `Menampilkan ${filtered.length} dari ${schedules.length} Jadwal` })}</span>
+                              <span>{t('booking.clickToSelect', 'Klik untuk memilih')}</span>
+                            </div>
+                            {filtered.map((schedule) => {
+                          const isSelected = currentBooking.scheduleId === schedule.id;
+                          return (
+                            <div
+                              key={schedule.id}
+                              onClick={() => {
+                                handleScheduleSelect(schedule.id);
+                                setScheduleSearchQuery(
+                                  `${schedule.route?.originCity?.name || ''} → ${schedule.route?.destinationCity?.name || ''} | ${schedule.departureTime}`
+                                );
+                                setIsScheduleDropdownOpen(false);
+                              }}
+                              className={`p-3 cursor-pointer hover:bg-blue-50 transition-colors flex items-center justify-between text-xs ${
+                                isSelected ? 'bg-blue-50 border-l-4 border-blue-600' : ''
+                              }`}
+                            >
+                              <div>
+                                <div className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                                  <span>{schedule.route?.originCity?.name || 'N/A'}</span>
+                                  <span className="text-blue-600 font-extrabold">→</span>
+                                  <span>{schedule.route?.destinationCity?.name || 'N/A'}</span>
+                                </div>
+                                <div className="text-gray-500 mt-1 flex flex-wrap items-center gap-2 text-[11px]">
+                                  <span className="bg-gray-100 px-1.5 py-0.5 rounded">📅 {formatDate(schedule.departureDate)}</span>
+                                  <span className="bg-blue-100 text-blue-800 font-bold px-1.5 py-0.5 rounded">⏰ {schedule.departureTime}</span>
+                                  <span>🚌 {schedule.vehicle?.vehicleType || 'Armada'} ({schedule.vehicle?.plateNumber})</span>
+                                  <span className="bg-blue-50 text-blue-700 font-medium px-1.5 py-0.5 rounded border border-blue-100">
+                                    🏢 {schedule.poolOrigin || `Pool ${schedule.route?.originCity?.name || ''}`} → 🏁 {schedule.poolDestination || `Pool ${schedule.route?.destinationCity?.name || ''}`}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <div className="text-right shrink-0 ml-3">
+                                <div className="font-extrabold text-blue-600 text-sm">
+                                  {formatCurrency(schedule.ticketPrice)}
+                                </div>
+                                <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full inline-block mt-0.5">
+                                  {t('schedule.seatsLeftCount', { available: schedule.availableSeats, total: schedule.vehicle?.capacity || 0, defaultValue: `Sisa ${schedule.availableSeats}/${schedule.vehicle?.capacity || 0} Kursi` })}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                          </>
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
                 </div>
 
                 {selectedSchedule && (
@@ -573,16 +803,24 @@ function BookingTiket() {
                       <div className="font-medium">
                         {selectedSchedule.route?.originCity?.name || 'N/A'} → {selectedSchedule.route?.destinationCity?.name || 'N/A'}
                       </div>
+                      <div className="text-gray-600">{t('schedule.poolOrigin', 'Pool Keberangkatan')}:</div>
+                      <div className="font-medium text-blue-900">
+                        {selectedSchedule.poolOrigin || (selectedSchedule.route?.originCity?.name ? `Pool ${selectedSchedule.route.originCity.name}` : '-')}
+                      </div>
+                      <div className="text-gray-600">{t('schedule.poolDestination', 'Pool Tujuan')}:</div>
+                      <div className="font-medium text-blue-900">
+                        {selectedSchedule.poolDestination || (selectedSchedule.route?.destinationCity?.name ? `Pool ${selectedSchedule.route.destinationCity.name}` : '-')}
+                      </div>
                       <div className="text-gray-600">{t('schedule.departureDate')}:</div>
                       <div className="font-medium">
-                        {formatDate(selectedSchedule.departureDate)} {selectedSchedule.departureTime}
+                        {formatDate(selectedSchedule.departureDate)} - {selectedSchedule.departureTime} WIB
                       </div>
                       <div className="text-gray-600">{t('schedule.vehicle')}:</div>
                       <div className="font-medium">
-                        {selectedSchedule.vehicle.vehicleType} ({selectedSchedule.vehicle.plateNumber})
+                        {selectedSchedule.vehicle?.vehicleType} ({selectedSchedule.vehicle?.plateNumber})
                       </div>
                       <div className="text-gray-600">{t('schedule.price')}/{t('booking.seat')}:</div>
-                      <div className="font-medium">{formatCurrency(selectedSchedule.ticketPrice)}</div>
+                      <div className="font-bold text-blue-700">{formatCurrency(selectedSchedule.ticketPrice)}</div>
                     </div>
                   </div>
                 )}
@@ -615,13 +853,79 @@ function BookingTiket() {
                     </div>
                   </div>
                 )}
+
+                {/* Input Data Penumpang / Customer */}
+                <div className="border-t border-gray-200 pt-4 space-y-3">
+                  <h4 className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                    {t('booking.passengerDataHeader', '👤 Data Penumpang / Customer')}
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        {t('booking.passengerName', 'Nama Penumpang')} *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={currentBooking.passengerName}
+                        onChange={(e) => setCurrentBooking({ ...currentBooking, passengerName: e.target.value })}
+                        placeholder={t('booking.passengerNamePlaceholder', 'Contoh: Budi Santoso')}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        {t('booking.passengerPhone', 'No. WhatsApp / HP')} *
+                      </label>
+                      <input
+                        type="tel"
+                        required
+                        value={currentBooking.passengerPhone}
+                        onChange={(e) => setCurrentBooking({ ...currentBooking, passengerPhone: e.target.value })}
+                        placeholder="0812xxxxxxxx"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        {t('booking.passengerEmail', 'Email Customer')}
+                      </label>
+                      <input
+                        type="email"
+                        value={currentBooking.passengerEmail}
+                        onChange={(e) => setCurrentBooking({ ...currentBooking, passengerEmail: e.target.value })}
+                        placeholder="budi@example.com"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        {t('booking.passengerNik', 'No. KTP / NIK (Opsional)')}
+                      </label>
+                      <input
+                        type="text"
+                        value={currentBooking.passengerNik}
+                        onChange={(e) => setCurrentBooking({ ...currentBooking, passengerNik: e.target.value })}
+                        placeholder="3273xxxxxxxxxxxx"
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="flex space-x-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  onClick={() => {
+                    setShowModal(false);
+                    setIsScheduleDropdownOpen(false);
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition cursor-pointer"
                 >
                   {t('common.cancel')}
                 </button>
@@ -665,8 +969,19 @@ function BookingTiket() {
                       return (
                         <div key={rowIndex} className="flex justify-center gap-3">
                           {rowSeats.map((seatNumber) => {
-                            const isBooked = availableSeats.bookedSeats.includes(seatNumber);
+                            const isConfirmed = (availableSeats.confirmedSeats || []).includes(seatNumber);
+                            const isPending = (availableSeats.pendingSeats || []).includes(seatNumber);
+                            const isBooked = isConfirmed || isPending || (availableSeats.bookedSeats || []).includes(seatNumber);
                             const isSelected = currentBooking.seatNumbers.includes(seatNumber);
+
+                            let buttonStyle = 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500';
+                            if (isSelected) {
+                              buttonStyle = 'bg-blue-600 text-white font-bold ring-2 ring-blue-300 shadow';
+                            } else if (isConfirmed) {
+                              buttonStyle = 'bg-blue-900 text-white font-bold cursor-not-allowed shadow-inner';
+                            } else if (isPending) {
+                              buttonStyle = 'bg-gray-300 text-gray-500 font-bold cursor-not-allowed';
+                            }
 
                             return (
                               <button
@@ -674,13 +989,8 @@ function BookingTiket() {
                                 type="button"
                                 onClick={() => !isBooked && handleSeatToggle(seatNumber)}
                                 disabled={isBooked}
-                                className={`p-3 w-12 h-12 rounded-lg font-medium transition ${
-                                  isBooked
-                                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                    : isSelected
-                                    ? 'bg-blue-600 text-white'
-                                    : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500'
-                                }`}
+                                title={isConfirmed ? `Kursi ${seatNumber} (Terkonfirmasi)` : isPending ? `Kursi ${seatNumber} (Pending)` : `Kursi ${seatNumber}`}
+                                className={`p-3 w-12 h-12 rounded-lg font-medium transition flex items-center justify-center ${buttonStyle}`}
                               >
                                 {seatNumber}
                               </button>
@@ -695,8 +1005,19 @@ function BookingTiket() {
                   <div className="grid grid-cols-5 gap-3">
                     {Array.from({ length: availableSeats.totalSeats }, (_, i) => {
                       const seatNumber = (i + 1).toString();
-                      const isBooked = availableSeats.bookedSeats.includes(seatNumber);
+                      const isConfirmed = (availableSeats.confirmedSeats || []).includes(seatNumber);
+                      const isPending = (availableSeats.pendingSeats || []).includes(seatNumber);
+                      const isBooked = isConfirmed || isPending || (availableSeats.bookedSeats || []).includes(seatNumber);
                       const isSelected = currentBooking.seatNumbers.includes(seatNumber);
+
+                      let buttonStyle = 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500';
+                      if (isSelected) {
+                        buttonStyle = 'bg-blue-600 text-white font-bold ring-2 ring-blue-300 shadow';
+                      } else if (isConfirmed) {
+                        buttonStyle = 'bg-blue-900 text-white font-bold cursor-not-allowed shadow-inner';
+                      } else if (isPending) {
+                        buttonStyle = 'bg-gray-300 text-gray-500 font-bold cursor-not-allowed';
+                      }
 
                       return (
                         <button
@@ -704,13 +1025,8 @@ function BookingTiket() {
                           type="button"
                           onClick={() => !isBooked && handleSeatToggle(seatNumber)}
                           disabled={isBooked}
-                          className={`p-3 rounded-lg font-medium transition ${
-                            isBooked
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : isSelected
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-white border-2 border-gray-300 text-gray-700 hover:border-blue-500'
-                          }`}
+                          title={isConfirmed ? `Kursi ${seatNumber} (Terkonfirmasi)` : isPending ? `Kursi ${seatNumber} (Pending)` : `Kursi ${seatNumber}`}
+                          className={`p-3 rounded-lg font-medium transition flex items-center justify-center ${buttonStyle}`}
                         >
                           {seatNumber}
                         </button>
@@ -720,19 +1036,23 @@ function BookingTiket() {
                 )}
               </div>
 
-              <div className="mt-6 flex items-center justify-between text-sm">
-                <div className="flex items-center space-x-4">
+              <div className="mt-6 flex flex-wrap items-center justify-between text-xs gap-2 pt-3 border-t border-gray-100">
+                <div className="flex flex-wrap items-center space-x-3">
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-blue-600 rounded mr-2"></div>
-                    <span>Terpilih</span>
+                    <div className="w-3.5 h-3.5 bg-blue-600 rounded mr-1.5 ring-1 ring-blue-400"></div>
+                    <span>{t('booking.selectedLabel', 'Terpilih')}</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-white border-2 border-gray-300 rounded mr-2"></div>
-                    <span>Tersedia</span>
+                    <div className="w-3.5 h-3.5 bg-blue-900 rounded mr-1.5"></div>
+                    <span>{t('booking.confirmedPaidLabel', 'Terkonfirmasi (Lunas)')}</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-4 h-4 bg-gray-200 rounded mr-2"></div>
-                    <span>Terpesan</span>
+                    <div className="w-3.5 h-3.5 bg-gray-300 rounded mr-1.5"></div>
+                    <span>{t('booking.pendingLabel', 'Pending')}</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3.5 h-3.5 bg-white border-2 border-gray-300 rounded mr-1.5"></div>
+                    <span>{t('booking.availableLabel', 'Tersedia')}</span>
                   </div>
                 </div>
               </div>
@@ -812,7 +1132,7 @@ function BookingTiket() {
                     <div className="flex justify-between pt-2 border-t border-blue-200">
                       <span className="text-gray-800 font-semibold">{t('booking.totalPayment')}:</span>
                       <span className="font-bold text-lg text-blue-600">
-                        {new Intl.NumberFormat(t('common.locale'), { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(paymentData.totalAmount)}
+                        {formatCurrency(paymentData.totalAmount)}
                       </span>
                     </div>
                   </div>

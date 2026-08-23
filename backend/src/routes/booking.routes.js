@@ -3,14 +3,13 @@ const router = express.Router();
 const bookingController = require('../controllers/booking.controller');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth.middleware');
 
-// All routes require authentication
-router.use(authMiddleware);
-
-// Get available schedules for booking (all authenticated users)
+// Public routes for guest booking from website (no login required)
 router.get('/schedules/available', bookingController.getAvailableSchedules);
-
-// Get available seats for a schedule (all authenticated users)
 router.get('/schedules/:scheduleId/seats', bookingController.getAvailableSeats);
+router.post('/public', bookingController.createPublicBooking);
+
+// All other routes require authentication
+router.use(authMiddleware);
 
 // Get all bookings (customers see their own, admin/operator see all)
 router.get('/', bookingController.getBookings);
@@ -26,5 +25,8 @@ router.put('/:id', roleMiddleware(['ADMIN', 'OPERATOR']), bookingController.upda
 
 // Cancel booking (all authenticated users can cancel their own)
 router.delete('/:id/cancel', bookingController.cancelBooking);
+
+// Delete booking permanently (only ADMIN and OPERATOR)
+router.delete('/:id', roleMiddleware(['ADMIN', 'OPERATOR']), bookingController.deleteBooking);
 
 module.exports = router;

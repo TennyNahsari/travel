@@ -24,6 +24,17 @@ const getSchedulesForCheckIn = async (req, res) => {
       where.routeId = routeId;
     }
 
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (driver) {
+        where.driverId = driver.id;
+      } else {
+        return res.json({ success: true, data: [] });
+      }
+    }
+
     const schedules = await prisma.schedule.findMany({
       where,
       include: {
@@ -89,11 +100,25 @@ const getSchedulesForCheckIn = async (req, res) => {
   }
 };
 
-// Get all bookings for a specific schedule
 const getScheduleBookings = async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const { status, checkedIn } = req.query;
+
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      const schedule = await prisma.schedule.findUnique({
+        where: { id: scheduleId }
+      });
+      if (!driver || !schedule || schedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Anda hanya dapat melihat data check-in pada jadwal yang ditugaskan kepada Anda'
+        });
+      }
+    }
 
     const where = {
       scheduleId,
@@ -191,6 +216,18 @@ const checkInBooking = async (req, res) => {
       });
     }
 
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (!driver || booking.schedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Anda hanya dapat melakukan check-in pada jadwal yang ditugaskan kepada Anda'
+        });
+      }
+    }
+
     // Check if booking is paid or confirmed
     if (!['PAID', 'CONFIRMED'].includes(booking.status)) {
       return res.status(400).json({
@@ -271,7 +308,8 @@ const undoCheckIn = async (req, res) => {
     const { id } = req.params;
 
     const booking = await prisma.booking.findUnique({
-      where: { id }
+      where: { id },
+      include: { schedule: true }
     });
 
     if (!booking) {
@@ -279,6 +317,18 @@ const undoCheckIn = async (req, res) => {
         success: false,
         message: 'Booking tidak ditemukan'
       });
+    }
+
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (!driver || booking.schedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Anda hanya dapat membatalkan check-in pada jadwal yang ditugaskan kepada Anda'
+        });
+      }
     }
 
     if (!booking.checkedIn) {
@@ -327,6 +377,21 @@ const bulkCheckIn = async (req, res) => {
   try {
     const { scheduleId } = req.params;
     const userId = req.user.id;
+
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      const schedule = await prisma.schedule.findUnique({
+        where: { id: scheduleId }
+      });
+      if (!driver || !schedule || schedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Anda hanya dapat melakukan bulk check-in pada jadwal yang ditugaskan kepada Anda'
+        });
+      }
+    }
 
     // Get all eligible bookings
     const bookings = await prisma.booking.findMany({
@@ -381,6 +446,21 @@ const bulkCheckIn = async (req, res) => {
 const getCheckInStats = async (req, res) => {
   try {
     const { scheduleId } = req.params;
+
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      const existingSchedule = await prisma.schedule.findUnique({
+        where: { id: scheduleId }
+      });
+      if (!driver || !existingSchedule || existingSchedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          message: 'Anda hanya dapat melihat statistik check-in pada jadwal yang ditugaskan kepada Anda'
+        });
+      }
+    }
 
     const schedule = await prisma.schedule.findUnique({
       where: { id: scheduleId },

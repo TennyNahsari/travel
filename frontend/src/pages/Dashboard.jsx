@@ -83,19 +83,18 @@ function Dashboard({ user, page = 'dashboard' }) {
         navigate('/manajemen-user');
         break;
       default:
-        // Handle other menus (not implemented yet)
         break;
     }
   };
 
   const getRoleBadgeColor = (role) => {
     const colors = {
-      ADMIN: 'bg-purple-100 text-purple-800',
-      OPERATOR: 'bg-green-100 text-green-800',
-      DRIVER: 'bg-yellow-100 text-yellow-800',
-      CUSTOMER: 'bg-blue-100 text-blue-800'
+      ADMIN: 'bg-travel-blue/15 text-travel-blue border border-travel-blue/30',
+      OPERATOR: 'bg-tropical-teal/15 text-tropical-teal border border-tropical-teal/30',
+      DRIVER: 'bg-sunset-orange/15 text-sunset-orange border border-sunset-orange/30',
+      CUSTOMER: 'bg-sky-100 text-sky-800'
     };
-    return colors[role] || 'bg-gray-100 text-gray-800';
+    return colors[role] || 'bg-slate-100 text-slate-800';
   };
 
   const toggleMenu = (menuId) => {
@@ -134,10 +133,10 @@ function Dashboard({ user, page = 'dashboard' }) {
   };
 
   const stats = [
-    { labelKey: 'dashboard.statistics.totalTrips', value: '12', icon: '🚐', color: 'bg-blue-50 text-blue-600' },
-    { labelKey: 'dashboard.statistics.bookingsToday', value: '8', icon: '🎫', color: 'bg-green-50 text-green-600' },
-    { labelKey: 'dashboard.statistics.activeVehicles', value: '5', icon: '🚗', color: 'bg-purple-50 text-purple-600' },
-    { labelKey: 'dashboard.statistics.totalRevenue', value: 'Rp 2.4M', icon: '💰', color: 'bg-yellow-50 text-yellow-600' }
+    { labelKey: 'dashboard.statistics.totalTrips', value: '12', icon: '🚐', color: 'bg-travel-blue/10 text-travel-blue border border-travel-blue/20' },
+    { labelKey: 'dashboard.statistics.bookingsToday', value: '8', icon: '🎫', color: 'bg-tropical-teal/10 text-tropical-teal border border-tropical-teal/20' },
+    { labelKey: 'dashboard.statistics.activeVehicles', value: '5', icon: '🚗', color: 'bg-sunset-orange/10 text-sunset-orange border border-sunset-orange/20' },
+    { labelKey: 'dashboard.statistics.totalRevenue', value: 'Rp 2.4M', icon: '💰', color: 'bg-emerald-50 text-emerald-600 border border-emerald-200' }
   ];
 
   const recentBookings = [
@@ -149,25 +148,30 @@ function Dashboard({ user, page = 'dashboard' }) {
   const menuItems = getMenuItems();
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
+    <div className="min-h-screen bg-soft-sky flex text-deep-navy font-sans">
       {/* Sidebar */}
-      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-gradient-to-b from-blue-600 to-blue-800 text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 ${
+      <aside className={`fixed inset-y-0 left-0 z-50 w-64 bg-deep-navy text-white transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:inset-0 border-r border-slate-800 ${
         sidebarOpen ? 'translate-x-0' : '-translate-x-full'
       }`}>
         <div className="flex flex-col h-full">
-          {/* Logo */}
-          <div className="flex items-center justify-between px-6 py-4 border-b border-blue-500">
-            <div className="flex items-center">
-              <div className="bg-white text-blue-600 rounded-lg p-2 mr-3">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                </svg>
+          {/* Logo Header */}
+          <div className="flex items-center justify-between px-6 py-5 border-b border-slate-800">
+            <button onClick={() => navigate('/')} className="flex items-center gap-2.5 text-left group">
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-travel-blue to-tropical-teal flex items-center justify-center text-white shadow-md">
+                <span className="text-lg">🧭</span>
               </div>
-              <span className="text-xl font-bold">Travel App</span>
-            </div>
+              <div>
+                <span className="text-lg font-extrabold text-white tracking-tight">
+                  Travel<span className="text-travel-blue">App</span>
+                </span>
+                <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-widest -mt-1">
+                  Back to Landing
+                </p>
+              </div>
+            </button>
             <button 
               onClick={() => setSidebarOpen(false)}
-              className="lg:hidden text-white hover:text-gray-200"
+              className="lg:hidden text-slate-400 hover:text-white"
             >
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -175,30 +179,29 @@ function Dashboard({ user, page = 'dashboard' }) {
             </button>
           </div>
 
-          {/* User Info */}
-          <div className="px-6 py-4 border-b border-blue-500">
-            <p className="text-sm text-blue-200">Logged in as</p>
-            <p className="text-base font-semibold mt-1">{currentUser?.name}</p>
-            <span className={`inline-block px-2 py-1 mt-2 text-xs font-semibold rounded ${getRoleBadgeColor(currentUser?.role)}`}>
+          {/* User Profile Info */}
+          <div className="px-6 py-4 border-b border-slate-800 bg-slate-900/50">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Logged in as</p>
+            <p className="text-sm font-bold text-white mt-0.5">{currentUser?.name}</p>
+            <span className={`inline-block px-2.5 py-0.5 mt-2 text-[11px] font-extrabold rounded-full ${getRoleBadgeColor(currentUser?.role)}`}>
               {currentUser?.role}
             </span>
           </div>
 
-          {/* Menu Items */}
-          <nav className="flex-1 px-4 py-6 overflow-y-auto">
-            <ul className="space-y-2">
+          {/* Navigation Menu */}
+          <nav className="flex-1 px-3 py-6 overflow-y-auto">
+            <ul className="space-y-1.5">
               {menuItems.map((menu) => (
                 <li key={menu.id}>
                   {menu.submenus ? (
-                    // Parent menu with submenus
                     <div>
                       <button
                         onClick={() => toggleMenu(menu.id)}
-                        className="w-full flex items-center justify-between px-4 py-3 rounded-lg transition-colors text-blue-100 hover:bg-blue-700 hover:text-white"
+                        className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-colors text-slate-300 hover:bg-white/10 hover:text-white"
                       >
                         <div className="flex items-center">
-                          <span className="text-xl mr-3">{menu.icon}</span>
-                          <span className="font-medium">{menu.label}</span>
+                          <span className="text-lg mr-3">{menu.icon}</span>
+                          <span className="text-sm font-bold">{menu.label}</span>
                         </div>
                         <svg 
                           className={`w-4 h-4 transition-transform ${
@@ -211,21 +214,21 @@ function Dashboard({ user, page = 'dashboard' }) {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                         </svg>
                       </button>
-                      {/* Submenus */}
+
                       {expandedMenus.includes(menu.id) && (
-                        <ul className="mt-2 ml-4 space-y-1">
+                        <ul className="mt-1.5 ml-3 pl-3 border-l border-slate-800 space-y-1">
                           {menu.submenus.map((submenu) => (
                             <li key={submenu.id}>
                               <button
                                 onClick={() => handleMenuClick(submenu.id)}
-                                className={`w-full flex items-center px-4 py-2 rounded-lg transition-colors ${
+                                className={`w-full flex items-center px-3.5 py-2 rounded-xl transition-all text-xs font-bold ${
                                   activeMenu === submenu.id
-                                    ? 'bg-white text-blue-600 shadow-md'
-                                    : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                                    ? 'bg-travel-blue text-white shadow-md shadow-travel-blue/30'
+                                    : 'text-slate-400 hover:bg-white/10 hover:text-white'
                                 }`}
                               >
-                                <span className="text-lg mr-3">{submenu.icon}</span>
-                                <span className="text-sm font-medium">{submenu.label}</span>
+                                <span className="text-base mr-2.5">{submenu.icon}</span>
+                                <span>{submenu.label}</span>
                               </button>
                             </li>
                           ))}
@@ -233,17 +236,16 @@ function Dashboard({ user, page = 'dashboard' }) {
                       )}
                     </div>
                   ) : (
-                    // Regular menu item
                     <button
                       onClick={() => handleMenuClick(menu.id)}
-                      className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
+                      className={`w-full flex items-center px-3.5 py-2.5 rounded-xl transition-all text-sm font-bold ${
                         activeMenu === menu.id
-                          ? 'bg-white text-blue-600 shadow-md'
-                          : 'text-blue-100 hover:bg-blue-700 hover:text-white'
+                          ? 'bg-travel-blue text-white shadow-md shadow-travel-blue/30'
+                          : 'text-slate-300 hover:bg-white/10 hover:text-white'
                       }`}
                     >
-                      <span className="text-xl mr-3">{menu.icon}</span>
-                      <span className="font-medium">{menu.label}</span>
+                      <span className="text-lg mr-3">{menu.icon}</span>
+                      <span>{menu.label}</span>
                     </button>
                   )}
                 </li>
@@ -251,13 +253,19 @@ function Dashboard({ user, page = 'dashboard' }) {
             </ul>
           </nav>
 
-          {/* Logout Button */}
-          <div className="px-4 py-4 border-t border-blue-500">
+          {/* Logout & Home Buttons */}
+          <div className="p-4 border-t border-slate-800 space-y-2">
+            <button
+              onClick={() => navigate('/')}
+              className="w-full flex items-center justify-center px-4 py-2.5 bg-white/10 hover:bg-white/20 text-white rounded-xl text-xs font-bold transition-colors"
+            >
+              🌐 Visit Landing Page
+            </button>
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center px-4 py-3 bg-red-500 hover:bg-red-600 rounded-lg transition-colors"
+              className="w-full flex items-center justify-center px-4 py-2.5 bg-red-500/20 hover:bg-red-500 text-red-300 hover:text-white border border-red-500/30 rounded-xl text-xs font-bold transition-all"
             >
-              <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
               </svg>
               {t('common.logout')}
@@ -269,35 +277,45 @@ function Dashboard({ user, page = 'dashboard' }) {
       {/* Overlay for mobile */}
       {sidebarOpen && (
         <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+          className="fixed inset-0 bg-deep-navy/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         ></div>
       )}
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col min-h-screen">
-        {/* Top Navbar */}
-        <header className="bg-white shadow-md sticky top-0 z-30">
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col min-h-screen min-w-0">
+        {/* Top Navbar Header */}
+        <header className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-30 shadow-soft">
           <div className="px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <button
                 onClick={() => setSidebarOpen(true)}
-                className="lg:hidden text-gray-600 hover:text-gray-900"
+                className="lg:hidden text-deep-navy p-2 hover:bg-soft-sky rounded-lg"
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
               
-              <h1 className="text-xl font-bold text-gray-800 lg:hidden">Travel App</h1>
+              <div className="flex items-center gap-2 lg:hidden">
+                <span className="text-lg font-extrabold text-deep-navy">
+                  Travel<span className="text-travel-blue">App</span>
+                </span>
+              </div>
               
               <div className="flex items-center space-x-4">
+                <button
+                  onClick={() => navigate('/')}
+                  className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 bg-soft-sky text-travel-blue hover:bg-travel-blue/10 border border-travel-blue/20 rounded-xl text-xs font-bold transition-colors"
+                >
+                  🌐 Landing Page
+                </button>
                 <LanguageSwitcher />
-                <button className="relative text-gray-600 hover:text-gray-900">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <button className="relative p-2 text-slate-600 hover:text-deep-navy hover:bg-soft-sky rounded-xl transition-colors">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
-                  <span className="absolute top-0 right-0 block h-2 w-2 rounded-full bg-red-500"></span>
+                  <span className="absolute top-1.5 right-1.5 block h-2 w-2 rounded-full bg-sunset-orange ring-2 ring-white"></span>
                 </button>
               </div>
             </div>
@@ -306,7 +324,6 @@ function Dashboard({ user, page = 'dashboard' }) {
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
-          {/* Render different pages based on activeMenu */}
           {activeMenu === 'kota' && <MasterKota />}
           {activeMenu === 'rute' && <MasterRute />}
           {activeMenu === 'armada' && <MasterArmada />}
@@ -319,77 +336,79 @@ function Dashboard({ user, page = 'dashboard' }) {
           {activeMenu === 'laporan' && <Laporan />}
           {activeMenu === 'users' && <ManajemenUser />}
           
-          {/* Dashboard Home (default) */}
+          {/* Dashboard Home */}
           {activeMenu === 'dashboard' && (
             <>
               {/* Welcome Section */}
-              <div className="mb-6 sm:mb-8">
-                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-800 mb-2">
+              <div className="mb-6 sm:mb-8 bg-gradient-to-r from-travel-blue via-blue-600 to-tropical-teal p-6 sm:p-8 rounded-3xl text-white shadow-card">
+                <h1 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold tracking-tight mb-2">
                   {t('common.welcome')}, {currentUser?.name}! 👋
                 </h1>
-                <p className="text-sm sm:text-base text-gray-600">{t('dashboard.subtitle')}</p>
+                <p className="text-white/90 text-sm sm:text-base font-normal max-w-2xl">
+                  {t('dashboard.subtitle')} — Kelola armada, rute, jadwal, dan booking tiket dalam satu panel dashboard terpadu.
+                </p>
               </div>
 
               {/* Stats Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
                 {stats.map((stat, index) => (
-                  <div key={index} className="bg-white rounded-xl shadow-md p-6 hover:shadow-lg transition">
+                  <div key={index} className="bg-white rounded-2xl shadow-soft p-6 border border-slate-100 hover:shadow-card transition-all">
                     <div className="flex items-center justify-between mb-4">
-                      <div className={`text-3xl ${stat.color} rounded-full w-12 h-12 flex items-center justify-center`}>
+                      <div className={`text-2xl ${stat.color} rounded-2xl w-12 h-12 flex items-center justify-center`}>
                         {stat.icon}
                       </div>
                     </div>
-                    <h3 className="text-gray-600 text-sm font-medium mb-1">{t(stat.labelKey)}</h3>
-                    <p className="text-2xl font-bold text-gray-800">{stat.value}</p>
+                    <h3 className="text-slate-gray text-xs font-bold uppercase tracking-wider mb-1">{t(stat.labelKey)}</h3>
+                    <p className="text-2xl font-extrabold text-deep-navy">{stat.value}</p>
                   </div>
                 ))}
               </div>
 
               {/* Recent Bookings */}
-              <div className="bg-white rounded-xl shadow-md p-4 sm:p-6">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-3">
-                  <h2 className="text-lg sm:text-xl font-bold text-gray-800">{t('dashboard.recentBookings')}</h2>
-                  <button className="text-blue-600 hover:text-blue-700 font-medium text-sm text-left sm:text-right">
-                    {t('dashboard.viewAll')} →
+              <div className="bg-white rounded-3xl shadow-soft border border-slate-100 p-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+                  <h2 className="text-lg sm:text-xl font-extrabold text-deep-navy">{t('dashboard.recentBookings')}</h2>
+                  <button className="text-travel-blue hover:text-travel-blue-dark font-bold text-xs flex items-center gap-1">
+                    <span>{t('dashboard.viewAll')}</span>
+                    <span>→</span>
                   </button>
                 </div>
 
-                {/* Desktop Table View - Hidden on mobile */}
                 <div className="hidden md:block overflow-x-auto">
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-soft-sky">
                       <tr>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-gray uppercase tracking-wider rounded-l-xl">
                           {t('dashboard.bookingCode')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-gray uppercase tracking-wider">
                           {t('dashboard.route')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-gray uppercase tracking-wider">
                           {t('dashboard.customer')}
                         </th>
-                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        <th className="px-4 py-3 text-left text-xs font-bold text-slate-gray uppercase tracking-wider rounded-r-xl">
                           {t('common.status')}
                         </th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-200">
+                    <tbody className="divide-y divide-slate-100">
                       {recentBookings.map((booking, index) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-4 text-sm font-medium text-gray-800">
+                        <tr key={index} className="hover:bg-soft-sky/50 transition-colors">
+                          <td className="px-4 py-4 text-xs font-bold text-deep-navy">
                             {booking.code}
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-600">
+                          <td className="px-4 py-4 text-xs text-slate-gray font-medium">
                             {booking.route}
                           </td>
-                          <td className="px-4 py-4 text-sm text-gray-600">
+                          <td className="px-4 py-4 text-xs text-slate-gray font-medium">
                             {booking.customer}
                           </td>
                           <td className="px-4 py-4">
-                            <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
-                              booking.status === 'PAID' ? 'bg-green-100 text-green-800' :
-                              booking.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                              'bg-yellow-100 text-yellow-800'
+                            <span className={`inline-block px-3 py-1 text-[11px] font-extrabold rounded-full ${
+                              booking.status === 'PAID' ? 'bg-tropical-teal/15 text-tropical-teal' :
+                              booking.status === 'CONFIRMED' ? 'bg-travel-blue/15 text-travel-blue' :
+                              'bg-sunset-orange/15 text-sunset-orange'
                             }`}>
                               {booking.status}
                             </span>
@@ -400,24 +419,23 @@ function Dashboard({ user, page = 'dashboard' }) {
                   </table>
                 </div>
 
-                {/* Mobile Card View - Shown only on mobile */}
                 <div className="md:hidden space-y-3">
                   {recentBookings.map((booking, index) => (
-                    <div key={index} className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition">
+                    <div key={index} className="border border-slate-100 rounded-2xl p-4 bg-soft-sky/40">
                       <div className="flex justify-between items-start mb-2">
                         <div>
-                          <p className="text-sm font-semibold text-gray-800">{booking.code}</p>
-                          <p className="text-xs text-gray-500 mt-1">{booking.route}</p>
+                          <p className="text-xs font-bold text-deep-navy">{booking.code}</p>
+                          <p className="text-xs text-slate-gray mt-0.5">{booking.route}</p>
                         </div>
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full whitespace-nowrap ${
-                          booking.status === 'PAID' ? 'bg-green-100 text-green-800' :
-                          booking.status === 'CONFIRMED' ? 'bg-blue-100 text-blue-800' :
-                          'bg-yellow-100 text-yellow-800'
+                        <span className={`px-2.5 py-0.5 text-[10px] font-extrabold rounded-full ${
+                          booking.status === 'PAID' ? 'bg-tropical-teal/15 text-tropical-teal' :
+                          booking.status === 'CONFIRMED' ? 'bg-travel-blue/15 text-travel-blue' :
+                          'bg-sunset-orange/15 text-sunset-orange'
                         }`}>
                           {booking.status}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-600">{booking.customer}</p>
+                      <p className="text-xs text-slate-gray">{booking.customer}</p>
                     </div>
                   ))}
                 </div>
@@ -430,12 +448,11 @@ function Dashboard({ user, page = 'dashboard' }) {
             </>
           )}
 
-          {/* Placeholder for other menus */}
           {!['dashboard', 'kota', 'rute', 'armada', 'driver', 'jadwal', 'booking', 'pembayaran', 'checkin', 'laporan', 'users', 'template-kursi'].includes(activeMenu) && (
-            <div className="bg-white rounded-xl shadow-md p-12 text-center">
+            <div className="bg-white rounded-3xl shadow-soft p-12 text-center border border-slate-100">
               <div className="text-6xl mb-4">🚧</div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">{t('dashboard.comingSoon')}</h2>
-              <p className="text-gray-600">{t('dashboard.featureInDevelopment')}</p>
+              <h2 className="text-2xl font-bold text-deep-navy mb-2">{t('dashboard.comingSoon')}</h2>
+              <p className="text-slate-gray">{t('dashboard.featureInDevelopment')}</p>
             </div>
           )}
         </main>

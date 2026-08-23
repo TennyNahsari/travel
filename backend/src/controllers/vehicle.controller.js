@@ -53,7 +53,7 @@ exports.getVehicleById = async (req, res) => {
 // Create vehicle
 exports.createVehicle = async (req, res) => {
   try {
-    const { plateNumber, vehicleType, seatTemplateId, status } = req.body;
+    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl } = req.body;
 
     // Validation
     if (!plateNumber || !vehicleType || !seatTemplateId) {
@@ -80,12 +80,24 @@ exports.createVehicle = async (req, res) => {
       return res.status(400).json({ error: 'Plate number already exists' });
     }
 
+    let parsedFacilities = facilities;
+    if (typeof facilities === 'string' && facilities.trim() !== '') {
+      try {
+        parsedFacilities = JSON.parse(facilities);
+      } catch (e) {
+        parsedFacilities = [facilities];
+      }
+    }
+
     const vehicle = await prisma.vehicle.create({
       data: {
         plateNumber,
         vehicleType,
         capacity: seatTemplate.totalSeats,
         seatTemplateId,
+        description: description || null,
+        facilities: parsedFacilities || null,
+        imageUrl: imageUrl || null,
         status: status || 'ACTIVE'
       },
       include: {
@@ -107,7 +119,7 @@ exports.createVehicle = async (req, res) => {
 exports.updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
-    const { plateNumber, vehicleType, seatTemplateId, status } = req.body;
+    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl } = req.body;
 
     // Validation
     if (!plateNumber || !vehicleType || !seatTemplateId) {
@@ -145,6 +157,15 @@ exports.updateVehicle = async (req, res) => {
       }
     }
 
+    let parsedFacilities = facilities;
+    if (typeof facilities === 'string' && facilities.trim() !== '') {
+      try {
+        parsedFacilities = JSON.parse(facilities);
+      } catch (e) {
+        parsedFacilities = [facilities];
+      }
+    }
+
     const vehicle = await prisma.vehicle.update({
       where: { id },
       data: {
@@ -152,6 +173,9 @@ exports.updateVehicle = async (req, res) => {
         vehicleType,
         capacity: seatTemplate.totalSeats,
         seatTemplateId,
+        description: description !== undefined ? description : existingVehicle.description,
+        facilities: parsedFacilities !== undefined ? parsedFacilities : existingVehicle.facilities,
+        imageUrl: imageUrl !== undefined ? imageUrl : existingVehicle.imageUrl,
         status: status || 'ACTIVE'
       },
       include: {

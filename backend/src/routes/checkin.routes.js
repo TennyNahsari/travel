@@ -46,18 +46,18 @@ router.post(
 );
 
 // Undo check-in (for corrections)
-// Accessible by: ADMIN, OPERATOR
+// Accessible by: ADMIN, OPERATOR, DRIVER
 router.post(
   '/bookings/:id/undo',
-  roleMiddleware(['ADMIN', 'OPERATOR']),
+  roleMiddleware(['ADMIN', 'OPERATOR', 'DRIVER']),
   undoCheckIn
 );
 
 // Bulk check-in all bookings in a schedule
-// Accessible by: ADMIN, OPERATOR
+// Accessible by: ADMIN, OPERATOR, DRIVER
 router.post(
   '/schedules/:scheduleId/bulk-checkin',
-  roleMiddleware(['ADMIN', 'OPERATOR']),
+  roleMiddleware(['ADMIN', 'OPERATOR', 'DRIVER']),
   bulkCheckIn
 );
 

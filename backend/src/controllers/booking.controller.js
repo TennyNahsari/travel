@@ -162,6 +162,12 @@ const getAvailableSeats = async (req, res) => {
     const schedule = await prisma.schedule.findUnique({
       where: { id: scheduleId },
       include: {
+        route: {
+          include: {
+            originCity: true,
+            destinationCity: true
+          }
+        },
         vehicle: {
           include: {
             seatTemplate: true
@@ -174,7 +180,8 @@ const getAvailableSeats = async (req, res) => {
             }
           },
           select: {
-            seatNumbers: true
+            seatNumbers: true,
+            status: true
           }
         }
       }
@@ -187,7 +194,15 @@ const getAvailableSeats = async (req, res) => {
       });
     }
 
-    // Get all booked seats
+    // Get booked seats by status
+    const pendingSeats = schedule.bookings
+      .filter(b => b.status === 'PENDING')
+      .flatMap(b => b.seatNumbers);
+
+    const confirmedSeats = schedule.bookings
+      .filter(b => b.status === 'PAID' || b.status === 'CONFIRMED')
+      .flatMap(b => b.seatNumbers);
+
     const bookedSeats = schedule.bookings.flatMap(booking => booking.seatNumbers);
     
     // Generate all seat numbers based on vehicle capacity
@@ -199,10 +214,12 @@ const getAvailableSeats = async (req, res) => {
     res.json({
       success: true,
       data: {
-        schedule: schedule,  // Include full schedule with vehicle and seatTemplate
+        schedule: schedule,
         totalSeats: schedule.vehicle.capacity,
         availableSeats: availableSeats,
         bookedSeats: bookedSeats,
+        pendingSeats: pendingSeats,
+        confirmedSeats: confirmedSeats,
         availableCount: availableSeats.length
       }
     });
@@ -218,17 +235,12 @@ const getAvailableSeats = async (req, res) => {
 // Create new booking
 const createBooking = async (req, res) => {
   try {
-    const { scheduleId, seatNumbers, userId } = req.body;
+    const { scheduleId, seatNumbers, userId, passengerName, passengerPhone, passengerEmail, passengerNik } = req.body;
 
-    // Determine the customer (admin/operator can book for other users)
+    // Determine the customer (admin/operator can book for other users, fallback to logged-in user if empty)
     let customerId = userId;
-    if (req.user.role === 'CUSTOMER') {
+    if (req.user.role === 'CUSTOMER' || !userId || typeof userId !== 'string' || userId.trim() === '') {
       customerId = req.user.id;
-    } else if (!userId) {
-      return res.status(400).json({
-        success: false,
-        error: 'User ID wajib diisi'
-      });
     }
 
     // Validate required fields
@@ -302,6 +314,10 @@ const createBooking = async (req, res) => {
           seatNumbers,
           totalSeats,
           totalPrice,
+          passengerName: passengerName || null,
+          passengerPhone: passengerPhone || null,
+          passengerEmail: passengerEmail || null,
+          passengerNik: passengerNik || null,
           status: 'PENDING'
         },
         include: {
@@ -396,14 +412,16 @@ const updateBooking = async (req, res) => {
 
       updateData.status = status;
 
-      // Set paidAt when marking as PAID
-      if (status === 'PAID' && existingBooking.status !== 'PAID') {
+      // Set paidAt when marking as PAID or CONFIRMED
+      if ((status === 'PAID' || status === 'CONFIRMED') && !existingBooking.paidAt) {
         updateData.paidAt = new Date();
       }
     }
 
     if (paymentMethod) {
       updateData.paymentMethod = paymentMethod;
+    } else if ((status === 'PAID' || status === 'CONFIRMED') && !existingBooking.paymentMethod) {
+      updateData.paymentMethod = 'Cash';
     }
 
     const booking = await prisma.booking.update({
@@ -564,9 +582,11 @@ const getAvailableSchedules = async (req, res) => {
         lt: nextDay
       };
     } else {
-      // Only show future schedules
+      // Show today's and future schedules
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
       where.departureDate = {
-        gte: new Date()
+        gte: startOfToday
       };
     }
     
@@ -617,6 +637,186 @@ const getAvailableSchedules = async (req, res) => {
   }
 };
 
+// Delete booking permanently
+const deleteBooking = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const booking = await prisma.booking.findUnique({
+      where: { id }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: 'Booking tidak ditemukan'
+      });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // Delete booking record
+      await tx.booking.delete({
+        where: { id }
+      });
+
+      // Restore available seats if booking wasn't already cancelled
+      if (booking.status !== 'CANCELLED') {
+        await tx.schedule.update({
+          where: { id: booking.scheduleId },
+          data: {
+            availableSeats: {
+              increment: booking.totalSeats
+            }
+          }
+        });
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Booking berhasil dihapus'
+    });
+  } catch (error) {
+    console.error('Error deleting booking:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal menghapus data booking'
+    });
+  }
+};
+
+// Public endpoint for guest booking from landing page (no login required)
+const createPublicBooking = async (req, res) => {
+  try {
+    const { scheduleId, seatNumbers, passengerName, passengerPhone, passengerEmail, passengerNik, paymentMethod } = req.body;
+
+    if (!scheduleId || !seatNumbers || !Array.isArray(seatNumbers) || seatNumbers.length === 0) {
+      return res.status(400).json({
+        success: false,
+        error: 'Jadwal dan nomor kursi wajib dipilih'
+      });
+    }
+
+    if (!passengerName || !passengerPhone) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nama dan Nomor Whatsapp pemesan wajib diisi'
+      });
+    }
+
+    // Check if schedule exists
+    const schedule = await prisma.schedule.findUnique({
+      where: { id: scheduleId },
+      include: {
+        vehicle: true,
+        bookings: {
+          where: {
+            status: {
+              in: ['PENDING', 'PAID', 'CONFIRMED']
+            }
+          },
+          select: {
+            seatNumbers: true
+          }
+        }
+      }
+    });
+
+    if (!schedule) {
+      return res.status(404).json({
+        success: false,
+        error: 'Jadwal tidak ditemukan'
+      });
+    }
+
+    // Check seat availability
+    const bookedSeats = schedule.bookings.flatMap(b => b.seatNumbers);
+    const conflictingSeats = seatNumbers.filter(seat => bookedSeats.includes(seat));
+    if (conflictingSeats.length > 0) {
+      return res.status(400).json({
+        success: false,
+        error: `Kursi ${conflictingSeats.join(', ')} sudah dipesan`
+      });
+    }
+
+    // Find or get customer user
+    let customerUser = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { email: passengerEmail || 'customer@travel.com' },
+          { phone: passengerPhone }
+        ]
+      }
+    });
+
+    if (!customerUser) {
+      customerUser = await prisma.user.findFirst({
+        where: { role: 'CUSTOMER' }
+      }) || await prisma.user.findFirst();
+    }
+
+    const totalSeats = seatNumbers.length;
+    const totalPrice = schedule.ticketPrice * totalSeats;
+    const bookingCode = 'TRV-' + Math.floor(100000 + Math.random() * 900000);
+
+    const newBooking = await prisma.$transaction(async (tx) => {
+      const booking = await tx.booking.create({
+        data: {
+          bookingCode,
+          userId: customerUser.id,
+          scheduleId,
+          seatNumbers,
+          totalSeats,
+          totalPrice,
+          passengerName,
+          passengerPhone,
+          passengerEmail: passengerEmail || null,
+          passengerNik: passengerNik || null,
+          paymentMethod: paymentMethod || 'Transfer Bank / QRIS',
+          status: 'PAID',
+          paidAt: new Date()
+        },
+        include: {
+          schedule: {
+            include: {
+              route: {
+                include: {
+                  originCity: true,
+                  destinationCity: true
+                }
+              },
+              vehicle: true
+            }
+          }
+        }
+      });
+
+      await tx.schedule.update({
+        where: { id: scheduleId },
+        data: {
+          availableSeats: {
+            decrement: totalSeats
+          }
+        }
+      });
+
+      return booking;
+    });
+
+    res.json({
+      success: true,
+      message: 'Booking berhasil dibuat',
+      data: newBooking
+    });
+  } catch (error) {
+    console.error('Error creating public booking:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal membuat booking: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   getBookings,
   getBookingById,
@@ -624,5 +824,7 @@ module.exports = {
   createBooking,
   updateBooking,
   cancelBooking,
-  getAvailableSchedules
+  deleteBooking,
+  getAvailableSchedules,
+  createPublicBooking
 };

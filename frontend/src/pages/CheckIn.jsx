@@ -1,12 +1,18 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import api from '../services/api';
+import api, { authService } from '../services/api';
 import Pagination from '../components/Pagination';
 
 function CheckIn() {
   const { t } = useTranslation();
+  const currentUser = authService.getCurrentUser();
+  const isDriver = currentUser?.role === 'DRIVER';
+  const isStaff = currentUser?.role === 'ADMIN' || currentUser?.role === 'OPERATOR';
+
   const [schedules, setSchedules] = useState([]);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
+
+  const canCheckIn = isStaff || (isDriver && selectedSchedule?.driver?.userId === currentUser?.id);
   const [bookings, setBookings] = useState([]);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -14,8 +20,28 @@ function CheckIn() {
   const [filterCheckedIn, setFilterCheckedIn] = useState('all');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  const filteredBookings = useMemo(() => {
+    return bookings.filter((booking) => {
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const name = (booking.passengerName || booking.user?.name || '').toLowerCase();
+      const phone = (booking.passengerPhone || booking.user?.phone || '').toLowerCase();
+      const code = (booking.bookingCode || '').toLowerCase();
+      const seats = (booking.seatNumbers || []).join(' ').toLowerCase();
+      const nik = (booking.passengerNik || '').toLowerCase();
+      return (
+        name.includes(q) ||
+        phone.includes(q) ||
+        code.includes(q) ||
+        seats.includes(q) ||
+        nik.includes(q)
+      );
+    });
+  }, [bookings, searchQuery]);
 
   useEffect(() => {
     fetchSchedules();
@@ -247,6 +273,13 @@ function CheckIn() {
             </div>
           ) : (
             <>
+              {!canCheckIn && (
+                <div className="mb-4 p-3.5 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-2 shadow-sm">
+                  <span className="text-base sm:text-lg">⚠️</span>
+                  <span>Jadwal ini ditugaskan kepada Driver: <strong>{selectedSchedule?.driver?.user?.name || 'Driver lain'}</strong>. Hak akses proses check-in hanya untuk Driver yang ditugaskan.</span>
+                </div>
+              )}
+
               {/* Stats Cards */}
               {stats && (
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-4 mb-4 sm:mb-6">
@@ -263,35 +296,48 @@ function CheckIn() {
                     <div className="text-xl sm:text-2xl font-bold text-yellow-600">{stats.pending}</div>
                   </div>
                   <div className="bg-white rounded-lg shadow-md p-3 sm:p-4">
-                    <div className="text-xs sm:text-sm text-gray-600 mb-1">{t('checkIn.totalSeats')}</div>
+                    <div className="text-xs sm:text-sm text-gray-600 mb-1">{t('checkIn.seatsCheckedIn')}</div>
                     <div className="text-xl sm:text-2xl font-bold text-blue-600">
-                      {stats.checkedInSeats}/{stats.totalSeats}
+                      {stats.checkedInSeats} / {stats.totalSeats}
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Action Bar */}
-              <div className="bg-white rounded-lg shadow-md p-3 sm:p-4 mb-3 sm:mb-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-                    <label className="text-xs sm:text-sm font-medium text-gray-700">
-                      {t('checkIn.filterStatus')}
-                    </label>
-                    <select
-                      value={filterCheckedIn}
-                      onChange={(e) => setFilterCheckedIn(e.target.value)}
-                      className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    >
-                      <option value="all">{t('checkIn.all')}</option>
-                      <option value="true">{t('checkIn.alreadyCheckedIn')}</option>
-                      <option value="false">{t('checkIn.notYetCheckedIn')}</option>
-                    </select>
+              {/* Action Bar & Filters */}
+              <div className="bg-white rounded-xl shadow-md p-3 sm:p-4 mb-4 sm:mb-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                  <div className="flex flex-1 flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                    <div className="flex items-center gap-2">
+                      <label className="text-xs sm:text-sm font-medium text-gray-700 whitespace-nowrap">
+                        {t('checkIn.filterStatus')}
+                      </label>
+                      <select
+                        value={filterCheckedIn}
+                        onChange={(e) => setFilterCheckedIn(e.target.value)}
+                        className="px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                      >
+                        <option value="all">{t('checkIn.all')}</option>
+                        <option value="true">{t('checkIn.alreadyCheckedIn')}</option>
+                        <option value="false">{t('checkIn.notYetCheckedIn')}</option>
+                      </select>
+                    </div>
+
+                    <div className="flex-1 max-w-sm">
+                      <input
+                        type="text"
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="🔎 Cari nama pemesan, No. WA, booking, kursi..."
+                        className="w-full px-3 py-2 text-xs sm:text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                      />
+                    </div>
                   </div>
-                  {stats && stats.pending > 0 && (
+
+                  {stats && stats.pending > 0 && canCheckIn && (
                     <button
                       onClick={handleBulkCheckIn}
-                      className="px-3 sm:px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap"
+                      className="px-3 sm:px-4 py-2 text-xs sm:text-sm bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition whitespace-nowrap shadow-sm"
                     >
                       {t('checkIn.checkInAll')} ({stats.pending})
                     </button>
@@ -309,194 +355,227 @@ function CheckIn() {
                 ) : (
                   <>
                   {/* Desktop Table View */}
-                  <div className="hidden md:block overflow-x-auto">
-                    <table className="w-full">
-                      <thead className="bg-gray-50 border-b border-gray-200">
-                        <tr>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.booking')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.passenger')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.seats')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.status')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.checkInTime')}
-                          </th>
-                          <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                            {t('checkIn.actions')}
-                          </th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {bookings.length === 0 ? (
+                    <div className="hidden md:block overflow-x-auto">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 border-b border-gray-200">
                           <tr>
-                            <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
-                              {t('checkIn.noBooking')}
-                            </td>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              No. Booking
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Nama Pemesan & Contact
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Nomor Kursi
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Status Check-in
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Waktu Check-in
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                              Aksi
+                            </th>
                           </tr>
-                        ) : (
-                          bookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((booking, index) => (
-                            <tr key={booking.id} className={`hover:bg-gray-50 ${booking.checkedIn ? 'bg-green-50' : ''}`}>
-                              <td className="px-6 py-4">
-                                <div className="text-sm font-medium text-gray-800">
-                                  {booking.bookingCode}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {booking.status}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="flex items-center">
-                                  <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                                    <span className="text-white font-semibold">
-                                      {booking.user.name.charAt(0).toUpperCase()}
-                                    </span>
-                                  </div>
-                                  <div className="ml-4">
-                                    <div className="text-sm font-medium text-gray-800">{booking.user.name}</div>
-                                    <div className="text-xs text-gray-500">{booking.user.phone || booking.user.email}</div>
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                <div className="text-sm text-gray-800">
-                                  {booking.seatNumbers.join(', ')}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {booking.totalSeats} {t('schedule.seats')}
-                                </div>
-                              </td>
-                              <td className="px-6 py-4">
-                                {booking.checkedIn ? (
-                                  <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                    ✓ {t('checkIn.checkedIn')}
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center px-3 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                    ⏳ {t('checkIn.notCheckedIn')}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-6 py-4 text-sm text-gray-600">
-                                {booking.checkedIn ? formatTime(booking.checkInTime) : '-'}
-                              </td>
-                              <td className="px-6 py-4">
-                                {booking.checkedIn ? (
-                                  <button
-                                    onClick={() => handleUndoCheckIn(booking.id)}
-                                    className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded hover:bg-red-200 transition"
-                                  >
-                                    {t('checkIn.undo')}
-                                  </button>
-                                ) : (
-                                  <button
-                                    onClick={() => handleCheckIn(booking.id)}
-                                    className="px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition"
-                                  >
-                                    {t('checkIn.checkIn')}
-                                  </button>
-                                )}
+                        </thead>
+                        <tbody className="divide-y divide-gray-200">
+                          {filteredBookings.length === 0 ? (
+                            <tr>
+                              <td colSpan="6" className="px-6 py-8 text-center text-gray-500">
+                                {searchQuery ? `Tidak ada data booking cocok dengan "${searchQuery}"` : t('checkIn.noBooking')}
                               </td>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                  
-                  {/* Mobile Card View */}
-                  <div className="md:hidden">
-                    {bookings.length === 0 ? (
-                      <div className="px-6 py-8 text-center text-gray-500">
-                        {t('checkIn.noBooking')}
-                      </div>
-                    ) : (
-                      <div className="divide-y divide-gray-200">
-                        {bookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((booking) => (
-                          <div key={booking.id} className={`p-4 ${booking.checkedIn ? 'bg-green-50' : ''}`}>
-                            {/* Header: Booking Code & Status */}
-                            <div className="flex justify-between items-start mb-3">
-                              <div>
-                                <p className="text-sm font-bold text-gray-800">{booking.bookingCode}</p>
-                                <p className="text-xs text-gray-500 mt-1">{booking.status}</p>
-                              </div>
-                              {booking.checkedIn ? (
-                                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                                  ✓ {t('checkIn.checkedIn')}
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                                  ⏳ {t('checkIn.notCheckedIn')}
-                                </span>
-                              )}
-                            </div>
+                          ) : (
+                            filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((booking) => {
+                              const passengerName = booking.passengerName || booking.user?.name || 'Customer';
+                              const passengerPhone = booking.passengerPhone || booking.user?.phone || '-';
 
-                            {/* Passenger Info */}
-                            <div className="flex items-center mb-3 pb-3 border-b border-gray-100">
-                              <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-400 to-blue-600 rounded-full flex items-center justify-center">
-                                <span className="text-white font-semibold text-sm">
-                                  {booking.user.name.charAt(0).toUpperCase()}
-                                </span>
-                              </div>
-                              <div className="ml-3">
-                                <div className="text-sm font-medium text-gray-800">{booking.user.name}</div>
-                                <div className="text-xs text-gray-500">{booking.user.phone || booking.user.email}</div>
-                              </div>
-                            </div>
+                              return (
+                                <tr key={booking.id} className={`hover:bg-gray-50 transition ${booking.checkedIn ? 'bg-green-50/60' : ''}`}>
+                                  <td className="px-6 py-4">
+                                    <div className="text-sm font-bold text-gray-900">
+                                      {booking.bookingCode}
+                                    </div>
+                                    <div className="text-xs font-semibold text-blue-600 mt-0.5">
+                                      {booking.status}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex items-center">
+                                      <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-sm">
+                                        <span className="text-white font-bold text-sm">
+                                          {passengerName.charAt(0).toUpperCase()}
+                                        </span>
+                                      </div>
+                                      <div className="ml-3">
+                                        <div className="text-sm font-bold text-gray-800">{passengerName}</div>
+                                        <div className="text-xs font-semibold text-emerald-700 flex items-center gap-1 mt-0.5">
+                                          <span>📱 WA:</span> {passengerPhone}
+                                        </div>
+                                        {booking.passengerNik && (
+                                          <div className="text-[11px] text-gray-500 mt-0.5">NIK: {booking.passengerNik}</div>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    <div className="flex flex-wrap gap-1">
+                                      {booking.seatNumbers.map((seat) => (
+                                        <span key={seat} className="inline-block bg-blue-100 text-blue-800 font-extrabold px-2.5 py-1 rounded-md text-xs shadow-sm">
+                                          Kursi {seat}
+                                        </span>
+                                      ))}
+                                    </div>
+                                    <div className="text-[11px] text-gray-500 mt-1 font-medium">
+                                      Total {booking.totalSeats} {t('schedule.seats')}
+                                    </div>
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {booking.checkedIn ? (
+                                      <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800 border border-green-200">
+                                        ✓ {t('checkIn.checkedIn')}
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center px-3 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800 border border-yellow-200">
+                                        ⏳ {t('checkIn.notCheckedIn')}
+                                      </span>
+                                    )}
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-600 font-medium">
+                                    {booking.checkedIn ? formatTime(booking.checkInTime) : '-'}
+                                  </td>
+                                  <td className="px-6 py-4">
+                                    {!canCheckIn ? (
+                                      <span className="text-xs text-gray-400 font-semibold italic">Driver lain</span>
+                                    ) : booking.checkedIn ? (
+                                      <button
+                                        onClick={() => handleUndoCheckIn(booking.id)}
+                                        className="px-3 py-1.5 text-xs font-semibold bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition"
+                                      >
+                                        {t('checkIn.undo')}
+                                      </button>
+                                    ) : (
+                                      <button
+                                        onClick={() => handleCheckIn(booking.id)}
+                                        className="px-3 py-1.5 text-xs font-bold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm"
+                                      >
+                                        {t('checkIn.checkIn')}
+                                      </button>
+                                    )}
+                                  </td>
+                                </tr>
+                              );
+                            })
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                    
+                    {/* Mobile Card View */}
+                    <div className="md:hidden">
+                      {filteredBookings.length === 0 ? (
+                        <div className="px-6 py-8 text-center text-gray-500">
+                          {searchQuery ? `Tidak ada data booking cocok dengan "${searchQuery}"` : t('checkIn.noBooking')}
+                        </div>
+                      ) : (
+                        <div className="divide-y divide-gray-200">
+                          {filteredBookings.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((booking) => {
+                            const passengerName = booking.passengerName || booking.user?.name || 'Customer';
+                            const passengerPhone = booking.passengerPhone || booking.user?.phone || '-';
 
-                            {/* Details Grid */}
-                            <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
-                              <div>
-                                <span className="text-gray-500">Kursi:</span>
-                                <p className="font-medium text-gray-800">{booking.seatNumbers.join(', ')}</p>
-                                <p className="text-gray-500">{booking.totalSeats} {t('schedule.seats')}</p>
-                              </div>
-                              <div>
-                                <span className="text-gray-500">Check-in:</span>
-                                <p className="font-medium text-gray-800">
-                                  {booking.checkedIn ? formatTime(booking.checkInTime) : '-'}
-                                </p>
-                              </div>
-                            </div>
+                            return (
+                              <div key={booking.id} className={`p-4 ${booking.checkedIn ? 'bg-green-50/60' : ''}`}>
+                                {/* Header: Booking Code & Status */}
+                                <div className="flex justify-between items-start mb-3">
+                                  <div>
+                                    <p className="text-sm font-bold text-gray-900">{booking.bookingCode}</p>
+                                    <p className="text-xs font-semibold text-blue-600 mt-0.5">{booking.status}</p>
+                                  </div>
+                                  {booking.checkedIn ? (
+                                    <span className="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full bg-green-100 text-green-800">
+                                      ✓ {t('checkIn.checkedIn')}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2.5 py-1 text-xs font-bold rounded-full bg-yellow-100 text-yellow-800">
+                                      ⏳ {t('checkIn.notCheckedIn')}
+                                    </span>
+                                  )}
+                                </div>
 
-                            {/* Action */}
-                            <div className="pt-3 border-t border-gray-100">
-                              {booking.checkedIn ? (
-                                <button
-                                  onClick={() => handleUndoCheckIn(booking.id)}
-                                  className="w-full px-3 py-2 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition font-medium"
-                                >
-                                  {t('checkIn.undo')}
-                                </button>
-                              ) : (
-                                <button
-                                  onClick={() => handleCheckIn(booking.id)}
-                                  className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium"
-                                >
-                                  {t('checkIn.checkIn')}
-                                </button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
+                                {/* Passenger Info */}
+                                <div className="flex items-center mb-3 pb-3 border-b border-gray-100">
+                                  <div className="flex-shrink-0 h-10 w-10 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shadow-sm">
+                                    <span className="text-white font-bold text-sm">
+                                      {passengerName.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <div className="ml-3">
+                                    <div className="text-sm font-bold text-gray-800">{passengerName}</div>
+                                    <div className="text-xs font-semibold text-emerald-700 mt-0.5">📱 WA: {passengerPhone}</div>
+                                    {booking.passengerNik && (
+                                      <div className="text-[11px] text-gray-500 mt-0.5">NIK: {booking.passengerNik}</div>
+                                    )}
+                                  </div>
+                                </div>
+
+                                {/* Details Grid */}
+                                <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+                                  <div>
+                                    <span className="text-gray-500 font-semibold">Nomor Kursi:</span>
+                                    <div className="flex flex-wrap gap-1 mt-1">
+                                      {booking.seatNumbers.map((seat) => (
+                                        <span key={seat} className="bg-blue-100 text-blue-800 font-extrabold px-2 py-0.5 rounded text-xs">
+                                          Kursi {seat}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-gray-500 font-semibold">Waktu Check-in:</span>
+                                    <p className="font-bold text-gray-800 mt-1">
+                                      {booking.checkedIn ? formatTime(booking.checkInTime) : '-'}
+                                    </p>
+                                  </div>
+                                </div>
+
+                                {/* Action */}
+                                <div className="pt-3 border-t border-gray-100">
+                                  {!canCheckIn ? (
+                                    <div className="text-xs text-gray-400 font-semibold italic text-center py-1">
+                                      Hak akses check-in hanya untuk Driver bertugas
+                                    </div>
+                                  ) : booking.checkedIn ? (
+                                    <button
+                                      onClick={() => handleUndoCheckIn(booking.id)}
+                                      className="w-full px-3 py-2 text-sm bg-red-50 text-red-700 rounded-lg hover:bg-red-100 transition font-medium"
+                                    >
+                                      {t('checkIn.undo')}
+                                    </button>
+                                  ) : (
+                                    <button
+                                      onClick={() => handleCheckIn(booking.id)}
+                                      className="w-full px-3 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold shadow-sm"
+                                    >
+                                      {t('checkIn.checkIn')}
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                    {!loading && (
+                      <Pagination
+                        currentPage={currentPage}
+                        totalItems={filteredBookings.length}
+                        itemsPerPage={itemsPerPage}
+                        onPageChange={setCurrentPage}
+                      />
                     )}
-                  </div>
                   </>
-                )}
-                {!loading && bookings.length > 0 && (
-                  <Pagination
-                    currentPage={currentPage}
-                    totalItems={bookings.length}
-                    itemsPerPage={itemsPerPage}
-                    onPageChange={setCurrentPage}
-                  />
                 )}
               </div>
             </>

@@ -128,7 +128,7 @@ const getScheduleById = async (req, res) => {
 // Create new schedule
 const createSchedule = async (req, res) => {
   try {
-    const { routeId, vehicleId, driverId, departureDate, departureTime, ticketPrice } = req.body;
+    const { routeId, vehicleId, driverId, departureDate, departureTime, ticketPrice, poolOrigin, poolDestination, imageUrl } = req.body;
 
     // Validate required fields
     if (!routeId || !vehicleId || !driverId || !departureDate || !departureTime || !ticketPrice) {
@@ -216,7 +216,10 @@ const createSchedule = async (req, res) => {
         departureDate: new Date(departureDate),
         departureTime,
         ticketPrice: parseInt(ticketPrice),
-        availableSeats: vehicle.capacity
+        availableSeats: vehicle.capacity,
+        poolOrigin: poolOrigin || null,
+        poolDestination: poolDestination || null,
+        imageUrl: imageUrl || null
       },
       include: {
         route: {
@@ -259,7 +262,7 @@ const createSchedule = async (req, res) => {
 const updateSchedule = async (req, res) => {
   try {
     const { id } = req.params;
-    const { routeId, vehicleId, driverId, departureDate, departureTime, ticketPrice, availableSeats } = req.body;
+    const { routeId, vehicleId, driverId, departureDate, departureTime, ticketPrice, availableSeats, poolOrigin, poolDestination, imageUrl } = req.body;
 
     // Check if schedule exists
     const existingSchedule = await prisma.schedule.findUnique({
@@ -338,6 +341,9 @@ const updateSchedule = async (req, res) => {
     if (departureTime) updateData.departureTime = departureTime;
     if (ticketPrice) updateData.ticketPrice = parseInt(ticketPrice);
     if (availableSeats !== undefined) updateData.availableSeats = parseInt(availableSeats);
+    if (poolOrigin !== undefined) updateData.poolOrigin = poolOrigin;
+    if (poolDestination !== undefined) updateData.poolDestination = poolDestination;
+    if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 
     // Check for conflicting schedules if date, time, vehicle, or driver changed
     if (departureDate || departureTime || vehicleId || driverId) {
@@ -446,6 +452,89 @@ const deleteSchedule = async (req, res) => {
   }
 };
 
+// Update schedule status (SCHEDULED, DEPARTED, COMPLETED, CANCELLED)
+const updateScheduleStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status } = req.body;
+    const validStatuses = ['SCHEDULED', 'DEPARTED', 'COMPLETED', 'CANCELLED'];
+
+    if (!validStatuses.includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: 'Status tidak valid'
+      });
+    }
+
+    const existingSchedule = await prisma.schedule.findUnique({
+      where: { id }
+    });
+
+    if (!existingSchedule) {
+      return res.status(404).json({
+        success: false,
+        error: 'Jadwal tidak ditemukan'
+      });
+    }
+
+    if (req.user.role === 'DRIVER') {
+      const driver = await prisma.driver.findUnique({
+        where: { userId: req.user.id }
+      });
+      if (!driver || existingSchedule.driverId !== driver.id) {
+        return res.status(403).json({
+          success: false,
+          error: 'Anda hanya dapat mengubah status jadwal yang ditugaskan kepada Anda'
+        });
+      }
+    }
+
+    const updateData = { status };
+    if (status === 'DEPARTED' && !existingSchedule.actualDepartureTime) {
+      updateData.actualDepartureTime = new Date();
+    } else if (status === 'COMPLETED' && !existingSchedule.actualArrivalTime) {
+      updateData.actualArrivalTime = new Date();
+    }
+
+    const schedule = await prisma.schedule.update({
+      where: { id },
+      data: updateData,
+      include: {
+        route: {
+          include: {
+            originCity: true,
+            destinationCity: true
+          }
+        },
+        vehicle: true,
+        driver: {
+          include: {
+            user: {
+              select: {
+                name: true,
+                email: true,
+                phone: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      data: schedule,
+      message: `Status jadwal berhasil diubah menjadi ${status}`
+    });
+  } catch (error) {
+    console.error('Error updating schedule status:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal mengupdate status jadwal'
+    });
+  }
+};
+
 // Get available routes for dropdown
 const getAvailableRoutes = async (req, res) => {
   try {
@@ -540,6 +629,7 @@ module.exports = {
   getScheduleById,
   createSchedule,
   updateSchedule,
+  updateScheduleStatus,
   deleteSchedule,
   getAvailableRoutes,
   getAvailableVehicles,

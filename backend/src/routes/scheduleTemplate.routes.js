@@ -3,7 +3,10 @@ const router = express.Router();
 const scheduleTemplateController = require('../controllers/scheduleTemplate.controller');
 const { authMiddleware, roleMiddleware } = require('../middleware/auth.middleware');
 
-// All routes require authentication
+// Public route for landing page
+router.get('/public', scheduleTemplateController.getPublicTemplates);
+
+// All other routes require authentication
 router.use(authMiddleware);
 
 // Generate schedules from templates
