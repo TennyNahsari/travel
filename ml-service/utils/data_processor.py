@@ -14,19 +14,20 @@ class DataProcessor:
             processed = []
             for booking in bookings_data:
                 try:
-                    # Parse date
-                    created_at = booking.get('created_at', '')
-                    if isinstance(created_at, str):
-                        date = pd.to_datetime(created_at).date()
+                    # Prefer departure_date if available for travel demand analysis, fall back to created_at
+                    raw_date = booking.get('departure_date') or booking.get('created_at', '')
+                    if isinstance(raw_date, str) and raw_date:
+                        date = pd.to_datetime(raw_date).date()
                     else:
-                        date = created_at
+                        date = raw_date
                     
                     processed.append({
                         'date': date,
                         'total_passengers': booking.get('total_passengers', 0),
                         'total_price': booking.get('total_price', 0),
                         'route_key': booking.get('route_key', ''),
-                        'status': booking.get('status', '')
+                        'status': booking.get('status', ''),
+                        'vehicle_capacity': booking.get('vehicle_capacity', 40)
                     })
                 except Exception as e:
                     print(f"Error processing booking: {str(e)}")
@@ -37,9 +38,9 @@ class DataProcessor:
             
             df = pd.DataFrame(processed)
             
-            # Filter only paid bookings
+            # Filter only paid or confirmed bookings
             if 'status' in df.columns:
-                df = df[df['status'] == 'PAID']
+                df = df[df['status'].isin(['PAID', 'CONFIRMED'])]
             
             # Remove invalid dates
             df = df[df['date'].notna()]

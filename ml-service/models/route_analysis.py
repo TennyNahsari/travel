@@ -13,6 +13,7 @@ class RouteAnalysis:
                 'total_bookings': 0,
                 'total_passengers': 0,
                 'total_revenue': 0,
+                'total_capacity': 0,
                 'dates': []
             })
             
@@ -21,10 +22,13 @@ class RouteAnalysis:
                 if not route_key:
                     continue
                 
+                capacity = booking.get('vehicle_capacity') or 40
+                
                 route_stats[route_key]['total_bookings'] += 1
                 route_stats[route_key]['total_passengers'] += booking.get('total_passengers', 0)
                 route_stats[route_key]['total_revenue'] += booking.get('total_price', 0)
-                route_stats[route_key]['dates'].append(booking.get('created_at', ''))
+                route_stats[route_key]['total_capacity'] += capacity
+                route_stats[route_key]['dates'].append(booking.get('departure_date') or booking.get('created_at', ''))
             
             # Convert to list and calculate metrics
             routes_list = []
@@ -35,9 +39,8 @@ class RouteAnalysis:
                 else:
                     origin = destination = route_key
                 
-                # Calculate occupancy estimation (assuming avg 40 seat capacity)
-                avg_capacity = 40
-                total_possible_passengers = stats['total_bookings'] * avg_capacity
+                # Calculate occupancy estimation using vehicle capacity
+                total_possible_passengers = stats['total_capacity'] if stats['total_capacity'] > 0 else (stats['total_bookings'] * 40)
                 occupancy_rate = (stats['total_passengers'] / total_possible_passengers) if total_possible_passengers > 0 else 0
                 
                 routes_list.append({

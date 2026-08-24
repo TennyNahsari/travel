@@ -203,6 +203,15 @@ model Booking {
   checkedIn         Boolean       @default(false)
   checkInTime       DateTime?
   checkInBy         String?       // User ID who performed check-in
+
+  // Payment Proof Fields
+  paymentProofUrl   String?       // URL / Foto Bukti Transfer
+  paymentSenderName String?       // Nama Pengirim / Pemilik Rekening
+  paymentBankName   String?       // Bank Asal Pengirim (misal: BCA)
+  paymentTargetBank String?       // Bank Tujuan Transfer
+  paymentAmount     Int?          // Jumlah yang ditransfer (Rp)
+  paymentNotes      String?       // Catatan konfirmasi pembayaran
+
   createdAt         DateTime      @default(now())
   updatedAt         DateTime      @updatedAt
 

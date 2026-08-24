@@ -16,7 +16,7 @@ const fetchTrainingData = async (req, res) => {
         createdAt: {
           gte: sixMonthsAgo
         },
-        status: 'PAID'
+        status: { in: ['PAID', 'CONFIRMED'] }
       },
       include: {
         schedule: {
@@ -26,7 +26,8 @@ const fetchTrainingData = async (req, res) => {
                 originCity: true,
                 destinationCity: true
               }
-            }
+            },
+            vehicle: true
           }
         }
       },
@@ -39,10 +40,14 @@ const fetchTrainingData = async (req, res) => {
     const processedBookings = bookings.map(booking => ({
       id: booking.id,
       created_at: booking.createdAt.toISOString(),
+      departure_date: booking.schedule?.departureDate ? booking.schedule.departureDate.toISOString() : booking.createdAt.toISOString(),
       total_passengers: booking.totalSeats,
       total_price: booking.totalPrice,
       status: booking.status,
-      route_key: `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+      route_key: booking.schedule?.route?.originCity?.name && booking.schedule?.route?.destinationCity?.name
+        ? `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+        : 'Unknown Route',
+      vehicle_capacity: booking.schedule?.vehicle?.capacity || 40
     }));
 
     // Get routes info
@@ -98,7 +103,7 @@ const trainModels = async (req, res) => {
         createdAt: {
           gte: sixMonthsAgo
         },
-        status: 'PAID'
+        status: { in: ['PAID', 'CONFIRMED'] }
       },
       include: {
         schedule: {
@@ -108,7 +113,8 @@ const trainModels = async (req, res) => {
                 originCity: true,
                 destinationCity: true
               }
-            }
+            },
+            vehicle: true
           }
         }
       },
@@ -127,10 +133,14 @@ const trainModels = async (req, res) => {
     // Process data
     const processedBookings = bookings.map(booking => ({
       created_at: booking.createdAt.toISOString(),
+      departure_date: booking.schedule?.departureDate ? booking.schedule.departureDate.toISOString() : booking.createdAt.toISOString(),
       total_passengers: booking.totalSeats,
       total_price: booking.totalPrice,
       status: booking.status,
-      route_key: `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+      route_key: booking.schedule?.route?.originCity?.name && booking.schedule?.route?.destinationCity?.name
+        ? `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+        : 'Unknown Route',
+      vehicle_capacity: booking.schedule?.vehicle?.capacity || 40
     }));
 
     // Call ML service to train
@@ -166,7 +176,7 @@ const getPredictions = async (req, res) => {
         createdAt: {
           gte: ninetyDaysAgo
         },
-        status: 'PAID'
+        status: { in: ['PAID', 'CONFIRMED'] }
       },
       include: {
         schedule: {
@@ -176,7 +186,8 @@ const getPredictions = async (req, res) => {
                 originCity: true,
                 destinationCity: true
               }
-            }
+            },
+            vehicle: true
           }
         }
       },
@@ -195,10 +206,14 @@ const getPredictions = async (req, res) => {
     // Process data
     const processedBookings = bookings.map(booking => ({
       created_at: booking.createdAt.toISOString(),
+      departure_date: booking.schedule?.departureDate ? booking.schedule.departureDate.toISOString() : booking.createdAt.toISOString(),
       total_passengers: booking.totalSeats,
       total_price: booking.totalPrice,
       status: booking.status,
-      route_key: `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+      route_key: booking.schedule?.route?.originCity?.name && booking.schedule?.route?.destinationCity?.name
+        ? `${booking.schedule.route.originCity.name} → ${booking.schedule.route.destinationCity.name}`
+        : 'Unknown Route',
+      vehicle_capacity: booking.schedule?.vehicle?.capacity || 40
     }));
 
     // Get routes

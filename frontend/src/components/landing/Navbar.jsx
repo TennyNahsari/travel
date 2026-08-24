@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
-import { Bus, Menu, X, Ticket } from 'lucide-react';
+import { Bus, Menu, X, Ticket, CreditCard } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import LanguageSwitcher from '../LanguageSwitcher';
 
-const Navbar = ({ onOpenBookingModal }) => {
+const Navbar = ({ onOpenBookingModal, onOpenPaymentConfirmationModal }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const { t } = useTranslation();
@@ -72,6 +72,13 @@ const Navbar = ({ onOpenBookingModal }) => {
           {/* Desktop Action Buttons */}
           <div className="hidden md:flex items-center gap-3">
             <LanguageSwitcher />
+            <button
+              onClick={() => onOpenPaymentConfirmationModal && onOpenPaymentConfirmationModal()}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-travel-blue border border-travel-blue/30 hover:border-travel-blue bg-travel-blue/5 hover:bg-travel-blue/10 rounded-xl transition-all"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>{t('landing.nav.checkPayment', 'Cek Pembayaran')}</span>
+            </button>
             <button
               onClick={() => onOpenBookingModal()}
               className="flex items-center gap-2 px-5 py-2.5 text-sm font-bold text-white bg-travel-blue hover:bg-travel-blue-hover rounded-xl shadow-md shadow-travel-blue/25 hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 transition-all"

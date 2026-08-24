@@ -7,6 +7,8 @@ const { authMiddleware, roleMiddleware } = require('../middleware/auth.middlewar
 router.get('/schedules/available', bookingController.getAvailableSchedules);
 router.get('/schedules/:scheduleId/seats', bookingController.getAvailableSeats);
 router.post('/public', bookingController.createPublicBooking);
+router.get('/public/code/:bookingCode', bookingController.getPublicBookingByCode);
+router.post('/public/confirm-payment', bookingController.submitPaymentConfirmation);
 
 // All other routes require authentication
 router.use(authMiddleware);

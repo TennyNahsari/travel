@@ -773,8 +773,8 @@ const createPublicBooking = async (req, res) => {
           passengerEmail: passengerEmail || null,
           passengerNik: passengerNik || null,
           paymentMethod: paymentMethod || 'Transfer Bank / QRIS',
-          status: 'PAID',
-          paidAt: new Date()
+          status: 'PENDING',
+          paidAt: null
         },
         include: {
           schedule: {
@@ -817,6 +817,136 @@ const createPublicBooking = async (req, res) => {
   }
 };
 
+// Public lookup for guest booking by code
+const getPublicBookingByCode = async (req, res) => {
+  try {
+    const { bookingCode } = req.params;
+
+    if (!bookingCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kode Booking wajib diisi'
+      });
+    }
+
+    const booking = await prisma.booking.findFirst({
+      where: {
+        bookingCode: {
+          equals: bookingCode.trim(),
+          mode: 'insensitive'
+        }
+      },
+      include: {
+        schedule: {
+          include: {
+            route: {
+              include: {
+                originCity: true,
+                destinationCity: true
+              }
+            },
+            vehicle: true
+          }
+        }
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: `Kode Booking "${bookingCode}" tidak ditemukan`
+      });
+    }
+
+    res.json({
+      success: true,
+      data: booking
+    });
+  } catch (error) {
+    console.error('Error fetching public booking:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal mengambil data booking'
+    });
+  }
+};
+
+// Public endpoint for submitting payment confirmation
+const submitPaymentConfirmation = async (req, res) => {
+  try {
+    const { bookingCode, senderName, bankName, targetBank, transferAmount, paymentProofUrl, notes } = req.body;
+
+    if (!bookingCode) {
+      return res.status(400).json({
+        success: false,
+        error: 'Kode Booking wajib diisi'
+      });
+    }
+
+    if (!senderName || !bankName) {
+      return res.status(400).json({
+        success: false,
+        error: 'Nama pengirim dan nama bank pengirim wajib diisi'
+      });
+    }
+
+    const booking = await prisma.booking.findFirst({
+      where: {
+        bookingCode: {
+          equals: bookingCode.trim(),
+          mode: 'insensitive'
+        }
+      }
+    });
+
+    if (!booking) {
+      return res.status(404).json({
+        success: false,
+        error: `Booking dengan kode "${bookingCode}" tidak ditemukan`
+      });
+    }
+
+    // Update booking with payment proof data
+    const updatedBooking = await prisma.booking.update({
+      where: { id: booking.id },
+      data: {
+        paymentSenderName: senderName,
+        paymentBankName: bankName,
+        paymentTargetBank: targetBank || 'PT Travel Shuttle Indonesia',
+        paymentAmount: transferAmount ? parseInt(transferAmount) : booking.totalPrice,
+        paymentProofUrl: paymentProofUrl || null,
+        paymentNotes: notes || null,
+        paymentMethod: `Transfer (${bankName})`
+      },
+      include: {
+        schedule: {
+          include: {
+            route: {
+              include: {
+                originCity: true,
+                destinationCity: true
+              }
+            },
+            vehicle: true
+          }
+        }
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Konfirmasi pembayaran berhasil dikirim. Tim staf kami akan memverifikasi pembayaran Anda.',
+      data: updatedBooking
+    });
+  } catch (error) {
+    console.error('Error submitting payment confirmation:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal mengonfirmasi pembayaran: ' + error.message
+    });
+  }
+};
+
 module.exports = {
   getBookings,
   getBookingById,
@@ -826,5 +956,7 @@ module.exports = {
   cancelBooking,
   deleteBooking,
   getAvailableSchedules,
-  createPublicBooking
+  createPublicBooking,
+  getPublicBookingByCode,
+  submitPaymentConfirmation
 };

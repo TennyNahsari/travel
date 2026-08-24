@@ -23,6 +23,7 @@ function BookingTiket() {
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
   const [selectedBookingForPayment, setSelectedBookingForPayment] = useState(null);
   const [createdBookingInfo, setCreatedBookingInfo] = useState(null);
+  const [selectedProofModalUrl, setSelectedProofModalUrl] = useState(null);
   const [currentBooking, setCurrentBooking] = useState({
     scheduleId: '',
     seatNumbers: [],
@@ -451,6 +452,32 @@ function BookingTiket() {
                         {booking.paymentMethod && (
                           <div className="text-xs text-gray-500 mt-1">{booking.paymentMethod}</div>
                         )}
+                        {/* Payment Proof Photo & Info */}
+                        {booking.paymentProofUrl ? (
+                          <div className="mt-2 flex items-center gap-2 bg-blue-50/80 p-1.5 rounded-lg border border-blue-200">
+                            <img
+                              src={booking.paymentProofUrl}
+                              alt="Bukti Transfer"
+                              onClick={() => setSelectedProofModalUrl(booking.paymentProofUrl)}
+                              className="w-10 h-10 object-cover rounded cursor-pointer border border-blue-300 hover:scale-105 transition-transform shrink-0"
+                              title="Klik untuk memperbesar bukti transfer"
+                              onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80'; }}
+                            />
+                            <div className="text-[11px] leading-tight">
+                              <span className="font-bold text-gray-800 block">{booking.paymentBankName || 'Bank'}</span>
+                              <span className="text-gray-600 block">a.n. {booking.paymentSenderName || 'Pengirim'}</span>
+                              <button
+                                type="button"
+                                onClick={() => setSelectedProofModalUrl(booking.paymentProofUrl)}
+                                className="text-blue-700 font-bold hover:underline text-[10px]"
+                              >
+                                🔍 Lihat Bukti
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic mt-1">Belum ada foto bukti transfer</div>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm">
                         <div className="flex flex-col space-y-1">
@@ -556,6 +583,28 @@ function BookingTiket() {
                         <div className="col-span-2">
                           <span className="text-gray-500">Payment:</span>
                           <p className="font-medium text-gray-800">{booking.paymentMethod}</p>
+                        </div>
+                      )}
+                      {booking.paymentProofUrl && (
+                        <div className="col-span-2 bg-blue-50/80 p-2.5 rounded-lg border border-blue-200 flex items-center gap-3 mt-1">
+                          <img
+                            src={booking.paymentProofUrl}
+                            alt="Bukti Transfer"
+                            onClick={() => setSelectedProofModalUrl(booking.paymentProofUrl)}
+                            className="w-12 h-12 object-cover rounded-lg border border-blue-300 cursor-pointer shrink-0"
+                            onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80'; }}
+                          />
+                          <div className="text-xs leading-tight">
+                            <span className="font-bold text-gray-800 block">Resi Transfer ({booking.paymentBankName || 'Bank'})</span>
+                            <span className="text-gray-600 block">a.n. {booking.paymentSenderName || '-'}</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedProofModalUrl(booking.paymentProofUrl)}
+                              className="text-blue-700 font-bold hover:underline text-[11px] mt-0.5"
+                            >
+                              🔍 Perbesar Bukti
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -1252,6 +1301,43 @@ function BookingTiket() {
           </div>
         );
       })()}
+      {/* Lightbox / Modal Preview Bukti Transfer */}
+      {selectedProofModalUrl && (
+        <div
+          className="fixed inset-0 bg-black/80 flex items-center justify-center z-[100] p-4"
+          onClick={() => setSelectedProofModalUrl(null)}
+        >
+          <div className="bg-white rounded-2xl p-4 max-w-lg w-full relative space-y-3 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-between items-center border-b border-gray-200 pb-2">
+              <h3 className="font-bold text-gray-800 text-sm">Foto Resi / Bukti Transfer</h3>
+              <button
+                type="button"
+                onClick={() => setSelectedProofModalUrl(null)}
+                className="text-gray-400 hover:text-gray-700 font-bold text-lg p-1"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="max-h-[70vh] overflow-auto flex items-center justify-center bg-gray-50 p-2 rounded-lg">
+              <img
+                src={selectedProofModalUrl}
+                alt="Bukti Transfer Perbesar"
+                className="max-w-full max-h-[65vh] object-contain rounded-lg shadow"
+                onError={(e) => { e.target.src = 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?auto=format&fit=crop&w=400&q=80'; }}
+              />
+            </div>
+            <div className="text-right pt-1">
+              <button
+                type="button"
+                onClick={() => setSelectedProofModalUrl(null)}
+                className="px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-lg transition"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

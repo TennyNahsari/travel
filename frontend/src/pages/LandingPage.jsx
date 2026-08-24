@@ -13,11 +13,13 @@ import DownloadCtaSection from '../components/landing/DownloadCtaSection';
 import Footer from '../components/landing/Footer';
 import DownloadModal from '../components/landing/DownloadModal';
 import TicketBookingModal from '../components/landing/TicketBookingModal';
+import PaymentConfirmationModal from '../components/landing/PaymentConfirmationModal';
 
 const LandingPage = () => {
   const navigate = useNavigate();
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isPaymentConfirmationModalOpen, setIsPaymentConfirmationModalOpen] = useState(false);
   const [bookingOrigin, setBookingOrigin] = useState('Jakarta (Pool Semanggi / Lebak Bulus)');
   const [bookingDestination, setBookingDestination] = useState('Bandung (Pool Pasteur / Dipatiukur)');
   const [selectedScheduleId, setSelectedScheduleId] = useState(null);
@@ -34,6 +36,7 @@ const LandingPage = () => {
       {/* 01. Navigation */}
       <Navbar
         onOpenBookingModal={handleOpenBookingModal}
+        onOpenPaymentConfirmationModal={() => setIsPaymentConfirmationModalOpen(true)}
         onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
       />
 
@@ -82,6 +85,11 @@ const LandingPage = () => {
         initialOrigin={bookingOrigin}
         initialDestination={bookingDestination}
         initialScheduleId={selectedScheduleId}
+      />
+
+      <PaymentConfirmationModal
+        isOpen={isPaymentConfirmationModalOpen}
+        onClose={() => setIsPaymentConfirmationModalOpen(false)}
       />
 
       <DownloadModal
