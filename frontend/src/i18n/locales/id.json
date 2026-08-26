@@ -40,6 +40,7 @@
     "checkIn": "Check-in Penumpang",
     "userManagement": "Manajemen User",
     "reports": "Laporan",
+    "qrisSetting": "Pengaturan QRIS",
     "aiPrediction": "Prediksi AI"
   },
   "dashboard": {

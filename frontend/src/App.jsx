@@ -99,6 +99,14 @@ function App() {
           } 
         />
         <Route 
+          path="/pengaturan-qris" 
+          element={
+            <ProtectedRoute>
+              <Dashboard user={user} page="qris" />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/check-in" 
           element={
             <ProtectedRoute>

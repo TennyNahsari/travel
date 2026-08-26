@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Search, CreditCard, CheckCircle2, AlertCircle, Image, Building2, User, DollarSign, Calendar, MapPin, Bus, FileText } from 'lucide-react';
-import api from '../../services/api';
+import { X, Search, CreditCard, CheckCircle2, AlertCircle, Image, Building2, User, DollarSign, Calendar, MapPin, Bus, FileText, QrCode } from 'lucide-react';
+import api, { qrisService, getImageUrl } from '../../services/api';
 
 const formatCurrency = (val) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(val || 0);
@@ -26,6 +26,23 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [qrisData, setQrisData] = useState(null);
+
+  useEffect(() => {
+    const fetchQris = async () => {
+      try {
+        const res = await qrisService.getQris();
+        if (res.success && res.data) {
+          setQrisData(res.data);
+        }
+      } catch (e) {
+        console.error('Error loading QRIS in payment modal:', e);
+      }
+    };
+    if (isOpen) {
+      fetchQris();
+    }
+  }, [isOpen]);
 
   // Confirmation Form state
   const [form, setForm] = useState({
@@ -257,6 +274,43 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
             </div>
           )}
 
+          {/* Initial State Payment Info Card (Shown before searching booking code) */}
+          {!bookingData && (
+            <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
+              <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 border-b border-blue-100 pb-2">
+                <QrCode className="w-4 h-4 text-blue-600" />
+                <span>Informasi Rekening Pembayaran Transfer & QRIS</span>
+              </h4>
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+                  <span className="font-sans font-bold text-slate-700 block text-xs">Rekening Bank Transfer:</span>
+                  <div><span className="text-gray-500 font-sans">BCA:</span> <strong>{qrisData?.bankBca || '123-456-7890 (a.n. PT Travel Shuttle)'}</strong></div>
+                  <div><span className="text-gray-500 font-sans">Mandiri:</span> <strong>{qrisData?.bankMandiri || '987-000-112233 (a.n. PT Travel Shuttle)'}</strong></div>
+                  {qrisData?.bankOther && (
+                    <div><span className="text-gray-500 font-sans">Lainnya:</span> <strong>{qrisData.bankOther}</strong></div>
+                  )}
+                </div>
+
+                <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
+                  <span className="font-sans font-bold text-slate-700 block text-xs">Scan Barcode QRIS:</span>
+                  {qrisData && qrisData.imageUrl ? (
+                    <div className="flex flex-col items-center space-y-1">
+                      <img 
+                        src={getImageUrl(qrisData.imageUrl)} 
+                        alt="QRIS Barcode" 
+                        className="w-32 h-32 object-contain border border-slate-200 rounded p-1"
+                      />
+                      <span className="text-[10px] font-bold font-mono text-slate-800">{qrisData.accountName || 'PT Travel Shuttle Indonesia'}</span>
+                    </div>
+                  ) : (
+                    <span className="text-[11px] text-slate-500">Scan QR Code QRIS di loket atau via e-wallet</span>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Booking Summary Card */}
           {bookingData && (
             <div className="space-y-4">
@@ -313,6 +367,43 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
                   </div>
                 </div>
               </div>
+
+              {/* QRIS Payment Instruction Card */}
+              {bookingData.status !== 'CANCELLED' && (
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50/50 border border-blue-200 rounded-xl p-4 space-y-3">
+                  <h4 className="font-bold text-slate-800 text-xs flex items-center gap-1.5 border-b border-blue-100 pb-2">
+                    <QrCode className="w-4 h-4 text-blue-600" />
+                    <span>Instruksi Pembayaran Transfer Bank / QRIS</span>
+                  </h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 space-y-1 font-mono text-[11px]">
+                      <span className="font-sans font-bold text-slate-700 block text-xs">Rekening Bank Transfer:</span>
+                      <div><span className="text-gray-500 font-sans">BCA:</span> <strong>{qrisData?.bankBca || '123-456-7890 (a.n. PT Travel Shuttle)'}</strong></div>
+                      <div><span className="text-gray-500 font-sans">Mandiri:</span> <strong>{qrisData?.bankMandiri || '987-000-112233 (a.n. PT Travel Shuttle)'}</strong></div>
+                      {qrisData?.bankOther && (
+                        <div><span className="text-gray-500 font-sans">Lainnya:</span> <strong>{qrisData.bankOther}</strong></div>
+                      )}
+                    </div>
+
+                    <div className="bg-white p-3 rounded-lg border border-slate-200 flex flex-col items-center justify-center text-center space-y-1.5">
+                      <span className="font-sans font-bold text-slate-700 block text-xs">Scan Barcode QRIS:</span>
+                      {qrisData && qrisData.imageUrl ? (
+                        <div className="flex flex-col items-center space-y-1">
+                          <img 
+                            src={getImageUrl(qrisData.imageUrl)} 
+                            alt="QRIS Barcode" 
+                            className="w-32 h-32 object-contain border border-slate-200 rounded p-1"
+                          />
+                          <span className="text-[10px] font-bold font-mono text-slate-800">{qrisData.accountName || 'PT Travel Shuttle Indonesia'}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[11px] text-slate-500">Scan QR Code QRIS di loket atau via e-wallet</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Direct WhatsApp Confirmation Link Button */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3">

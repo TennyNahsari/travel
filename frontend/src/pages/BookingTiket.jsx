@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import api, { authService } from '../services/api';
+import api, { authService, qrisService, getImageUrl } from '../services/api';
 import Pagination from '../components/Pagination';
 
 // Helper function to get seat numbers for a specific row
@@ -18,6 +18,21 @@ function BookingTiket() {
   const [schedules, setSchedules] = useState([]);
   const [availableSeats, setAvailableSeats] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [qrisData, setQrisData] = useState(null);
+
+  useEffect(() => {
+    const fetchQris = async () => {
+      try {
+        const res = await qrisService.getQris();
+        if (res.success && res.data) {
+          setQrisData(res.data);
+        }
+      } catch (e) {
+        console.error('Failed to load QRIS in BookingTiket page:', e);
+      }
+    };
+    fetchQris();
+  }, []);
   const [showModal, setShowModal] = useState(false);
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
@@ -1262,16 +1277,26 @@ function BookingTiket() {
                   <div className="text-center">
                     <p className="text-sm text-gray-600 mb-4">{t('booking.qrisScan')}</p>
                     <div className="inline-block bg-white p-4 rounded-lg border-2 border-gray-300">
-                      {/* Dummy QR Code - Using placeholder */}
-                      <div className="w-48 h-48 bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
-                        <div className="text-center">
-                          <svg className="w-16 h-16 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
-                          </svg>
-                          <p className="text-xs text-gray-500">QR Code QRIS</p>
-                          <p className="text-xs text-gray-400 mt-1">Dummy Image</p>
+                      {qrisData && qrisData.imageUrl ? (
+                        <div className="text-center space-y-2">
+                          <img 
+                            src={getImageUrl(qrisData.imageUrl)} 
+                            alt="QRIS Merchant" 
+                            className="w-48 h-48 object-contain mx-auto rounded"
+                          />
+                          <p className="text-xs font-bold text-gray-800">{qrisData.accountName || 'PT Travel Shuttle Indonesia'}</p>
                         </div>
-                      </div>
+                      ) : (
+                        <div className="w-48 h-48 bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300 rounded">
+                          <div className="text-center">
+                            <svg className="w-16 h-16 mx-auto text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z" />
+                            </svg>
+                            <p className="text-xs text-gray-500">QR Code QRIS</p>
+                            <p className="text-xs text-gray-400 mt-1">Belum ada gambar QRIS</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <p className="text-xs text-gray-500 mt-3">
                       {t('booking.amount')}: <span className="font-bold">

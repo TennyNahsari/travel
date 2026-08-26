@@ -262,7 +262,7 @@ const getModelStatus = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('Error getting model status:', error);
+    console.error('Error getting model status:', error.message);
     res.status(500).json({
       success: false,
       message: 'ML service unavailable',

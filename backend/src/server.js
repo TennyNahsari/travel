@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const authRoutes = require('./routes/auth.routes');
 const cityRoutes = require('./routes/city.routes');
 const routeRoutes = require('./routes/route.routes');
@@ -15,6 +16,7 @@ const laporanRoutes = require('./routes/laporan.routes');
 const seatTemplateRoutes = require('./routes/seatTemplate.routes');
 const scheduleTemplateRoutes = require('./routes/scheduleTemplate.routes');
 const mlRoutes = require('./routes/ml.routes');
+const qrisRoutes = require('./routes/qris.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -28,6 +30,9 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Serve static uploaded files
+app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
 
 // Routes
 app.use('/api/auth', authRoutes);
@@ -44,6 +49,7 @@ app.use('/api/laporan', laporanRoutes);
 app.use('/api/seat-templates', seatTemplateRoutes);
 app.use('/api/schedule-templates', scheduleTemplateRoutes);
 app.use('/api/ml', mlRoutes);
+app.use('/api/qris', qrisRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

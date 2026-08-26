@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { X, Bus, Calendar, MapPin, Users, Ticket, CheckCircle2, QrCode, ArrowRight, ShieldCheck, CreditCard, Clock, ChevronDown, Search } from 'lucide-react';
-import api, { authService } from '../../services/api';
+import api, { authService, qrisService, getImageUrl } from '../../services/api';
 
 const getRowSeats = (rowIndex, rowsConfig) => {
   const seatsBeforeRow = rowsConfig.slice(0, rowIndex).reduce((sum, seats) => sum + seats, 0);
@@ -34,6 +34,21 @@ const TicketBookingModal = ({ isOpen, onClose, initialOrigin = 'Jakarta', initia
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
   const [createdBookingInfo, setCreatedBookingInfo] = useState(null);
+  const [qrisData, setQrisData] = useState(null);
+
+  useEffect(() => {
+    const fetchQris = async () => {
+      try {
+        const res = await qrisService.getQris();
+        if (res.success && res.data) {
+          setQrisData(res.data);
+        }
+      } catch (e) {
+        console.error('Failed to fetch QRIS in modal:', e);
+      }
+    };
+    fetchQris();
+  }, []);
 
   const [isScheduleDropdownOpen, setIsScheduleDropdownOpen] = useState(false);
   const [scheduleSearchQuery, setScheduleSearchQuery] = useState('');
@@ -708,14 +723,46 @@ const TicketBookingModal = ({ isOpen, onClose, initialOrigin = 'Jakarta', initia
 
                 <div className="bg-gray-50 p-3 rounded-lg space-y-2 font-mono text-xs text-gray-800 border border-gray-200">
                   <div>
-                    <span className="text-gray-500 font-sans">BCA:</span> <strong>123-456-7890</strong> (a.n. PT Travel Shuttle Indonesia)
+                    <span className="text-gray-500 font-sans">BCA:</span> <strong>{qrisData?.bankBca || '123-456-7890 (a.n. PT Travel Shuttle Indonesia)'}</strong>
                   </div>
                   <div>
-                    <span className="text-gray-500 font-sans">Mandiri:</span> <strong>987-000-112233</strong> (a.n. PT Travel Shuttle Indonesia)
+                    <span className="text-gray-500 font-sans">Mandiri:</span> <strong>{qrisData?.bankMandiri || '987-000-112233 (a.n. PT Travel Shuttle Indonesia)'}</strong>
                   </div>
-                  <div>
-                    <span className="text-gray-500 font-sans">QRIS:</span> {t('booking.qrisInstruction', 'Pindai QR Code di loket atau saat boarding')}
+                  {qrisData?.bankOther && (
+                    <div>
+                      <span className="text-gray-500 font-sans">Lainnya:</span> <strong>{qrisData.bankOther}</strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* QRIS Display */}
+                <div className="bg-gradient-to-br from-blue-50 to-slate-50 border border-blue-200 rounded-xl p-3.5 space-y-2.5 text-center">
+                  <div className="flex items-center justify-center gap-1.5 font-bold text-slate-800 text-xs">
+                    <QrCode className="w-4 h-4 text-blue-600" />
+                    <span>Pembayaran via QRIS All Payment</span>
                   </div>
+                  
+                  {qrisData && qrisData.imageUrl ? (
+                    <div className="flex flex-col items-center space-y-2">
+                      <div className="bg-white p-2.5 rounded-xl border border-gray-200 shadow-sm inline-block">
+                        <img 
+                          src={getImageUrl(qrisData.imageUrl)} 
+                          alt="QRIS Code" 
+                          className="w-44 h-44 object-contain mx-auto rounded"
+                        />
+                      </div>
+                      <span className="text-[11px] font-bold text-gray-800 font-mono">
+                        {qrisData.accountName || 'PT Travel Shuttle Indonesia'}
+                      </span>
+                      <p className="text-[11px] text-gray-600 max-w-xs leading-relaxed font-sans">
+                        {qrisData.instruction || 'Scan QR Code QRIS di atas menggunakan GoPay, OVO, Dana, ShopeePay, BCA Mobile, atau aplikasi e-wallet / mobile banking lainnya.'}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-gray-500 font-sans">
+                      {t('booking.qrisInstruction', 'Pindai QR Code di loket atau tunjukkan saat konfirmasi boarding.')}
+                    </p>
+                  )}
                 </div>
               </div>
 

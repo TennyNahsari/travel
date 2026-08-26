@@ -38,6 +38,7 @@
     "checkIn": "Check-in Passengers",
     "userManagement": "User Management",
     "reports": "Reports",
+    "qrisSetting": "QRIS Settings",
     "aiPrediction": "AI Prediction"
   },
   "dashboard": {

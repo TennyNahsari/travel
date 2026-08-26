@@ -59,4 +59,34 @@ export const authService = {
   }
 };
 
+// QRIS service
+export const qrisService = {
+  getQris: async () => {
+    const response = await api.get('/qris');
+    return response.data;
+  },
+
+  updateQris: async (data) => {
+    const response = await api.post('/qris', data);
+    return response.data;
+  },
+
+  deleteQris: async () => {
+    const response = await api.delete('/qris');
+    return response.data;
+  }
+};
+
+// Helper for resolving backend image URLs
+export const getImageUrl = (url) => {
+  if (!url) return '';
+  if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    return url;
+  }
+  const apiBase = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+  const serverBase = apiBase.replace(/\/api\/?$/, '');
+  return `${serverBase}${url.startsWith('/') ? '' : '/'}${url}`;
+};
+
 export default api;
+

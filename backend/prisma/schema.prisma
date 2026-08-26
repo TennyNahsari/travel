@@ -228,3 +228,21 @@ enum ScheduleStatus {
   COMPLETED
   CANCELLED
 }
+
+model QrisSetting {
+  id          String   @id @default(uuid())
+  accountName String?  @default("PT Travel Shuttle Indonesia")
+  imageUrl    String?
+  instruction String?  @default("Scan QR Code QRIS di bawah menggunakan mobile banking atau e-wallet (GoPay/OVO/Dana/ShopeePay)")
+  bankBca     String?  @default("123-456-7890 (a.n. PT Travel Shuttle Indonesia)")
+  bankMandiri String?  @default("987-000-112233 (a.n. PT Travel Shuttle Indonesia)")
+  bankOther   String?
+  waNumber    String?  @default("6281234567890")
+  isActive    Boolean  @default(true)
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@map("qris_settings")
+}
+
+
