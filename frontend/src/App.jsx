@@ -107,6 +107,14 @@ function App() {
           } 
         />
         <Route 
+          path="/pengaturan-sosmed" 
+          element={
+            <ProtectedRoute>
+              <Dashboard user={user} page="sosmed" />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/check-in" 
           element={
             <ProtectedRoute>

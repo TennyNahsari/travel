@@ -77,6 +77,19 @@ export const qrisService = {
   }
 };
 
+// Social Media service
+export const socialService = {
+  getSocialSettings: async () => {
+    const response = await api.get('/social');
+    return response.data;
+  },
+
+  updateSocialSettings: async (data) => {
+    const response = await api.post('/social', data);
+    return response.data;
+  }
+};
+
 // Helper for resolving backend image URLs
 export const getImageUrl = (url) => {
   if (!url) return '';

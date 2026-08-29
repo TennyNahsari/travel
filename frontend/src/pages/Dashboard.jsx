@@ -15,6 +15,7 @@ import Pembayaran from './Pembayaran';
 import CheckIn from './CheckIn';
 import Laporan from './Laporan';
 import PengaturanQris from './PengaturanQris';
+import PengaturanSosmed from './PengaturanSosmed';
 import AIPrediction from '../components/AIPrediction';
 
 function Dashboard({ user, page = 'dashboard' }) {
@@ -77,6 +78,9 @@ function Dashboard({ user, page = 'dashboard' }) {
       case 'qris':
         navigate('/pengaturan-qris');
         break;
+      case 'sosmed':
+        navigate('/pengaturan-sosmed');
+        break;
       case 'checkin':
         navigate('/check-in');
         break;
@@ -124,6 +128,7 @@ function Dashboard({ user, page = 'dashboard' }) {
           { id: 'template-kursi', label: t('sidebar.masterSeatTemplate'), icon: '🪑', roles: ['ADMIN', 'OPERATOR'] },
           { id: 'armada', label: t('sidebar.masterVehicle'), icon: '🚐', roles: ['ADMIN', 'OPERATOR'] },
           { id: 'qris', label: t('sidebar.qrisSetting', 'Pengaturan QRIS'), icon: '📱', roles: ['ADMIN', 'OPERATOR'] },
+          { id: 'sosmed', label: t('sidebar.socialSetting', 'Pengaturan Social Media'), icon: '🌐', roles: ['ADMIN', 'OPERATOR'] },
         ]
       },
       { id: 'jadwal', label: t('sidebar.travelSchedule'), icon: '📅', roles: ['ADMIN', 'OPERATOR', 'DRIVER'] },
@@ -338,6 +343,7 @@ function Dashboard({ user, page = 'dashboard' }) {
           {activeMenu === 'booking' && <BookingTiket />}
           {activeMenu === 'pembayaran' && <Pembayaran />}
           {activeMenu === 'qris' && <PengaturanQris />}
+          {activeMenu === 'sosmed' && <PengaturanSosmed />}
           {activeMenu === 'checkin' && <CheckIn />}
           {activeMenu === 'laporan' && <Laporan />}
           {activeMenu === 'users' && <ManajemenUser />}
@@ -454,7 +460,7 @@ function Dashboard({ user, page = 'dashboard' }) {
             </>
           )}
 
-          {!['dashboard', 'kota', 'rute', 'armada', 'driver', 'jadwal', 'booking', 'pembayaran', 'checkin', 'laporan', 'users', 'template-kursi', 'qris'].includes(activeMenu) && (
+          {!['dashboard', 'kota', 'rute', 'armada', 'driver', 'jadwal', 'booking', 'pembayaran', 'checkin', 'laporan', 'users', 'template-kursi', 'qris', 'sosmed'].includes(activeMenu) && (
             <div className="bg-white rounded-3xl shadow-soft p-12 text-center border border-slate-100">
               <div className="text-6xl mb-4">🚧</div>
               <h2 className="text-2xl font-bold text-deep-navy mb-2">{t('dashboard.comingSoon')}</h2>

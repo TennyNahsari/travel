@@ -245,4 +245,19 @@ model QrisSetting {
   @@map("qris_settings")
 }
 
+model SocialSetting {
+  id           String   @id @default(uuid())
+  instagramUrl String?  @default("https://instagram.com")
+  twitterUrl   String?  @default("https://twitter.com")
+  youtubeUrl   String?  @default("https://youtube.com")
+  facebookUrl  String?  @default("https://facebook.com")
+  linkedinUrl  String?  @default("https://linkedin.com")
+  threadsUrl   String?  @default("https://threads.net")
+  isActive     Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@map("social_settings")
+}
+
 

@@ -17,6 +17,7 @@ const seatTemplateRoutes = require('./routes/seatTemplate.routes');
 const scheduleTemplateRoutes = require('./routes/scheduleTemplate.routes');
 const mlRoutes = require('./routes/ml.routes');
 const qrisRoutes = require('./routes/qris.routes');
+const socialRoutes = require('./routes/social.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -50,6 +51,7 @@ app.use('/api/seat-templates', seatTemplateRoutes);
 app.use('/api/schedule-templates', scheduleTemplateRoutes);
 app.use('/api/ml', mlRoutes);
 app.use('/api/qris', qrisRoutes);
+app.use('/api/social', socialRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
