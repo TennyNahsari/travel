@@ -1,74 +1,188 @@
 const { PrismaClient } = require('@prisma/client');
 const prisma = new PrismaClient();
 
-// Get all payments (bookings with PAID/CONFIRMED status)
+// Get unified payments (Tickets CONFIRMED, Charters COMPLETED, Packages COMPLETED)
 const getPayments = async (req, res) => {
   try {
-    const { startDate, endDate, paymentMethod, search } = req.query;
-    
-    const where = {
-      status: {
-        in: ['PAID', 'CONFIRMED']
-      }
-    };
-    
-    // Filter by date range
+    const { startDate, endDate, paymentMethod, type, search } = req.query;
+
+    const dateFilter = {};
     if (startDate || endDate) {
-      where.paidAt = {};
       if (startDate) {
-        where.paidAt.gte = new Date(startDate);
+        dateFilter.gte = new Date(startDate);
       }
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.paidAt.lte = end;
+        dateFilter.lte = end;
       }
-    }
-    
-    // Filter by payment method
-    if (paymentMethod) {
-      where.paymentMethod = paymentMethod;
-    }
-    
-    // Search by booking code
-    if (search) {
-      where.bookingCode = {
-        contains: search,
-        mode: 'insensitive'
-      };
     }
 
-    const payments = await prisma.booking.findMany({
-      where,
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
+    let ticketList = [];
+    let charterList = [];
+    let packageList = [];
+
+    // 1. Fetch Shuttle Ticket Bookings (CONFIRMED / PAID)
+    if (!type || type === 'ALL' || type === 'TICKET') {
+      const ticketWhere = {
+        status: { in: ['CONFIRMED', 'PAID'] }
+      };
+      if (startDate || endDate) {
+        ticketWhere.paidAt = dateFilter;
+      }
+      if (paymentMethod) {
+        ticketWhere.paymentMethod = paymentMethod;
+      }
+      if (search) {
+        ticketWhere.OR = [
+          { bookingCode: { contains: search, mode: 'insensitive' } },
+          { user: { name: { contains: search, mode: 'insensitive' } } },
+          { passengerName: { contains: search, mode: 'insensitive' } },
+          { passengerPhone: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      ticketList = await prisma.booking.findMany({
+        where: ticketWhere,
+        include: {
+          user: { select: { id: true, name: true, email: true, phone: true } },
+          schedule: {
+            include: {
+              route: { include: { originCity: true, destinationCity: true } },
+              vehicle: true
+            }
           }
         },
-        schedule: {
-          include: {
-            route: {
-              include: {
-                originCity: true,
-                destinationCity: true
-              }
-            },
-            vehicle: true
-          }
-        }
-      },
-      orderBy: {
-        paidAt: 'desc'
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    // 2. Fetch Charter Car Bookings (COMPLETED)
+    if (!type || type === 'ALL' || type === 'CHARTER') {
+      const charterWhere = {
+        status: 'COMPLETED'
+      };
+      if (startDate || endDate) {
+        charterWhere.createdAt = dateFilter;
       }
-    });
+      if (paymentMethod) {
+        charterWhere.paymentMethod = paymentMethod;
+      }
+      if (search) {
+        charterWhere.OR = [
+          { charterCode: { contains: search, mode: 'insensitive' } },
+          { customerName: { contains: search, mode: 'insensitive' } },
+          { customerPhone: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      charterList = await prisma.charter.findMany({
+        where: charterWhere,
+        include: {
+          vehicle: true,
+          originCity: true,
+          destinationCity: true,
+          user: { select: { id: true, name: true, email: true, phone: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    // 3. Fetch Package Bookings (COMPLETED)
+    if (!type || type === 'ALL' || type === 'PACKAGE') {
+      const packageWhere = {
+        status: 'COMPLETED'
+      };
+      if (startDate || endDate) {
+        packageWhere.createdAt = dateFilter;
+      }
+      if (paymentMethod) {
+        packageWhere.paymentMethod = paymentMethod;
+      }
+      if (search) {
+        packageWhere.OR = [
+          { packageCode: { contains: search, mode: 'insensitive' } },
+          { senderName: { contains: search, mode: 'insensitive' } },
+          { senderPhone: { contains: search, mode: 'insensitive' } },
+          { recipientName: { contains: search, mode: 'insensitive' } }
+        ];
+      }
+
+      packageList = await prisma.packageBooking.findMany({
+        where: packageWhere,
+        include: {
+          schedule: {
+            include: {
+              route: { include: { originCity: true, destinationCity: true } },
+              vehicle: true
+            }
+          },
+          user: { select: { id: true, name: true, email: true } }
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+    }
+
+    // Normalize into unified structure
+    const formattedTickets = ticketList.map((b) => ({
+      id: b.id,
+      type: 'TICKET',
+      typeLabel: 'Tiket Shuttle',
+      code: b.bookingCode,
+      customerName: b.user?.name || b.passengerName || 'Pelanggan Tiket',
+      customerPhone: b.user?.phone || b.passengerPhone || '-',
+      serviceName: `${b.schedule?.route?.originCity?.name || ''} → ${b.schedule?.route?.destinationCity?.name || ''}`,
+      details: `${b.seats?.length || 1} Kursi (${b.seats?.join(', ') || 'Auto'})`,
+      totalPrice: b.totalPrice,
+      paymentMethod: b.paymentMethod || 'TRANSFER',
+      status: b.status,
+      paidAt: b.paidAt || b.createdAt,
+      createdAt: b.createdAt,
+      fullData: b
+    }));
+
+    const formattedCharters = charterList.map((c) => ({
+      id: c.id,
+      type: 'CHARTER',
+      typeLabel: 'Charter Car',
+      code: c.charterCode,
+      customerName: c.customerName,
+      customerPhone: c.customerPhone,
+      serviceName: `Charter ${c.vehicle?.vehicleType || 'Armada'} (${c.originCity?.name || c.originAddress || ''} → ${c.destinationCity?.name || c.destinationAddress || ''})`,
+      details: `${c.totalVehicles || 1} Unit (${c.durationDays || 1} Hari)`,
+      totalPrice: c.totalPrice,
+      paymentMethod: c.paymentMethod || 'TRANSFER',
+      status: c.status,
+      paidAt: c.paidAt || c.updatedAt || c.createdAt,
+      createdAt: c.createdAt,
+      fullData: c
+    }));
+
+    const formattedPackages = packageList.map((p) => ({
+      id: p.id,
+      type: 'PACKAGE',
+      typeLabel: 'Pengiriman Paket',
+      code: p.packageCode,
+      customerName: p.senderName,
+      customerPhone: p.senderPhone,
+      serviceName: `Paket (${p.schedule?.route?.originCity?.name || ''} → ${p.schedule?.route?.destinationCity?.name || ''})`,
+      details: `${p.itemCount || 1} Unit (${p.weightKg || 1} Kg) - ${p.packageDescription || ''}`,
+      totalPrice: p.totalPrice,
+      paymentMethod: p.paymentMethod || 'TRANSFER',
+      status: p.status,
+      paidAt: p.paidAt || p.updatedAt || p.createdAt,
+      createdAt: p.createdAt,
+      fullData: p
+    }));
+
+    // Combine & sort descending by date
+    const combinedPayments = [...formattedTickets, ...formattedCharters, ...formattedPackages].sort(
+      (a, b) => new Date(b.paidAt) - new Date(a.paidAt)
+    );
 
     res.json({
       success: true,
-      data: payments
+      data: combinedPayments
     });
   } catch (error) {
     console.error('Error fetching payments:', error);
@@ -79,102 +193,71 @@ const getPayments = async (req, res) => {
   }
 };
 
-// Get payment statistics
+// Get aggregated payment statistics
 const getPaymentStats = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
-    
-    const where = {
-      status: {
-        in: ['PAID', 'CONFIRMED']
-      }
-    };
-    
-    // Filter by date range
+
+    const dateFilter = {};
     if (startDate || endDate) {
-      where.paidAt = {};
-      if (startDate) {
-        where.paidAt.gte = new Date(startDate);
-      }
+      if (startDate) dateFilter.gte = new Date(startDate);
       if (endDate) {
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
-        where.paidAt.lte = end;
+        dateFilter.lte = end;
       }
     }
 
-    // Get payment statistics
-    const [
-      totalPayments,
-      totalRevenue,
-      paymentsByMethod,
-      recentPayments
-    ] = await prisma.$transaction([
-      // Total payments count
-      prisma.booking.count({ where }),
-      
-      // Total revenue
-      prisma.booking.aggregate({
-        where,
-        _sum: {
-          totalPrice: true
-        }
-      }),
-      
-      // Payments grouped by method
-      prisma.booking.groupBy({
-        by: ['paymentMethod'],
-        where,
-        _count: true,
-        _sum: {
-          totalPrice: true
-        }
-      }),
-      
-      // Recent payments (last 7 days)
-      prisma.booking.count({
-        where: {
-          ...where,
-          paidAt: {
-            gte: new Date(new Date().setDate(new Date().getDate() - 7))
-          }
-        }
-      })
+    const ticketWhere = { status: { in: ['CONFIRMED', 'PAID'] } };
+    const charterWhere = { status: 'COMPLETED' };
+    const packageWhere = { status: 'COMPLETED' };
+
+    if (startDate || endDate) {
+      ticketWhere.paidAt = dateFilter;
+      charterWhere.createdAt = dateFilter;
+      packageWhere.createdAt = dateFilter;
+    }
+
+    const [tickets, charters, packages] = await Promise.all([
+      prisma.booking.findMany({ where: ticketWhere, select: { totalPrice: true, paidAt: true, createdAt: true } }),
+      prisma.charter.findMany({ where: charterWhere, select: { totalPrice: true, createdAt: true } }),
+      prisma.packageBooking.findMany({ where: packageWhere, select: { totalPrice: true, createdAt: true } })
     ]);
 
-    // Get today's revenue
-    const todayStart = new Date();
-    todayStart.setHours(0, 0, 0, 0);
-    
-    const todayRevenue = await prisma.booking.aggregate({
-      where: {
-        ...where,
-        paidAt: {
-          gte: todayStart
-        }
-      },
-      _sum: {
-        totalPrice: true
-      }
-    });
+    const ticketRevenue = tickets.reduce((sum, b) => sum + (b.totalPrice || 0), 0);
+    const charterRevenue = charters.reduce((sum, c) => sum + (c.totalPrice || 0), 0);
+    const packageRevenue = packages.reduce((sum, p) => sum + (p.totalPrice || 0), 0);
 
-    // Format payment methods data
-    const methodsStats = paymentsByMethod.reduce((acc, curr) => {
-      acc[curr.paymentMethod || 'Unknown'] = {
-        count: curr._count,
-        total: curr._sum.totalPrice || 0
-      };
-      return acc;
-    }, {});
+    const totalRevenue = ticketRevenue + charterRevenue + packageRevenue;
+    const totalPayments = tickets.length + charters.length + packages.length;
+
+    // Calculate today's revenue
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
+    const todayTickets = tickets.filter(t => new Date(t.paidAt || t.createdAt) >= startOfToday);
+    const todayCharters = charters.filter(c => new Date(c.createdAt) >= startOfToday);
+    const todayPackages = packages.filter(p => new Date(p.createdAt) >= startOfToday);
+
+    const todayRevenue = 
+      todayTickets.reduce((sum, t) => sum + (t.totalPrice || 0), 0) +
+      todayCharters.reduce((sum, c) => sum + (c.totalPrice || 0), 0) +
+      todayPackages.reduce((sum, p) => sum + (p.totalPrice || 0), 0);
 
     res.json({
       success: true,
       data: {
+        totalRevenue,
         totalPayments,
-        totalRevenue: totalRevenue._sum.totalPrice || 0,
-        todayRevenue: todayRevenue._sum.totalPrice || 0,
-        recentPayments,
-        byPaymentMethod: methodsStats
+        todayRevenue,
+        breakdown: {
+          ticketsCount: tickets.length,
+          ticketRevenue,
+          chartersCount: charters.length,
+          charterRevenue,
+          packagesCount: packages.length,
+          packageRevenue
+        }
       }
     });
   } catch (error) {
@@ -186,170 +269,173 @@ const getPaymentStats = async (req, res) => {
   }
 };
 
-// Get payment by booking ID
+// Delete payment transaction by type and ID
+const deletePayment = async (req, res) => {
+  try {
+    const { type, id } = req.params;
+
+    if (type === 'TICKET') {
+      await prisma.booking.delete({ where: { id } });
+    } else if (type === 'CHARTER') {
+      await prisma.charter.delete({ where: { id } });
+    } else if (type === 'PACKAGE') {
+      await prisma.packageBooking.delete({ where: { id } });
+    } else {
+      // Fallback try deleting from booking or charter or package
+      try {
+        await prisma.booking.delete({ where: { id } });
+      } catch (e1) {
+        try {
+          await prisma.charter.delete({ where: { id } });
+        } catch (e2) {
+          await prisma.packageBooking.delete({ where: { id } });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      message: 'Transaksi pembayaran berhasil dihapus'
+    });
+  } catch (error) {
+    console.error('Delete payment error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Gagal menghapus transaksi pembayaran'
+    });
+  }
+};
+
+// Get single payment details
 const getPaymentById = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const payment = await prisma.booking.findUnique({
+    // Check booking first
+    const booking = await prisma.booking.findUnique({
       where: { id },
       include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-            phone: true
-          }
-        },
+        user: { select: { id: true, name: true, email: true, phone: true } },
         schedule: {
           include: {
-            route: {
-              include: {
-                originCity: true,
-                destinationCity: true
-              }
-            },
-            vehicle: true,
-            driver: {
-              include: {
-                user: {
-                  select: {
-                    name: true,
-                    phone: true
-                  }
-                }
-              }
-            }
+            route: { include: { originCity: true, destinationCity: true } },
+            vehicle: true
           }
         }
       }
     });
 
-    if (!payment) {
-      return res.status(404).json({
-        success: false,
-        error: 'Pembayaran tidak ditemukan'
-      });
-    }
-
-    if (!payment.paidAt) {
-      return res.status(400).json({
-        success: false,
-        error: 'Booking belum dibayar'
-      });
-    }
-
-    res.json({
-      success: true,
-      data: payment
-    });
-  } catch (error) {
-    console.error('Error fetching payment:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Gagal mengambil data pembayaran'
-    });
-  }
-};
-
-// Get payment methods summary
-const getPaymentMethods = async (req, res) => {
-  try {
-    const paymentMethods = await prisma.booking.findMany({
-      where: {
-        status: {
-          in: ['PAID', 'CONFIRMED']
-        },
-        paymentMethod: {
-          not: null
+    if (booking) {
+      return res.json({
+        success: true,
+        data: {
+          id: booking.id,
+          type: 'TICKET',
+          code: booking.bookingCode,
+          customerName: booking.user?.name || booking.passengerName,
+          customerPhone: booking.user?.phone || booking.passengerPhone,
+          serviceName: `${booking.schedule?.route?.originCity?.name} → ${booking.schedule?.route?.destinationCity?.name}`,
+          details: `${booking.seats?.length || 1} Kursi (${booking.seats?.join(', ') || 'Auto'})`,
+          totalPrice: booking.totalPrice,
+          paymentMethod: booking.paymentMethod,
+          status: booking.status,
+          paidAt: booking.paidAt || booking.createdAt,
+          fullData: booking
         }
-      },
-      select: {
-        paymentMethod: true
-      },
-      distinct: ['paymentMethod']
+      });
+    }
+
+    // Check charter
+    const charter = await prisma.charter.findUnique({
+      where: { id },
+      include: {
+        vehicle: true,
+        originCity: true,
+        destinationCity: true,
+        user: { select: { id: true, name: true, email: true, phone: true } }
+      }
     });
 
-    const methods = paymentMethods.map(p => p.paymentMethod).filter(Boolean);
+    if (charter) {
+      return res.json({
+        success: true,
+        data: {
+          id: charter.id,
+          type: 'CHARTER',
+          code: charter.charterCode,
+          customerName: charter.customerName,
+          customerPhone: charter.customerPhone,
+          serviceName: `Charter ${charter.vehicle?.vehicleType} (${charter.originCity?.name || charter.originAddress} → ${charter.destinationCity?.name || charter.destinationAddress})`,
+          details: `${charter.totalVehicles} Unit (${charter.durationDays} Hari)`,
+          totalPrice: charter.totalPrice,
+          paymentMethod: charter.paymentMethod,
+          status: charter.status,
+          paidAt: charter.paidAt || charter.createdAt,
+          fullData: charter
+        }
+      });
+    }
 
-    res.json({
-      success: true,
-      data: methods
+    // Check package
+    const pkg = await prisma.packageBooking.findUnique({
+      where: { id },
+      include: {
+        schedule: {
+          include: {
+            route: { include: { originCity: true, destinationCity: true } },
+            vehicle: true
+          }
+        },
+        user: { select: { id: true, name: true, email: true } }
+      }
     });
+
+    if (pkg) {
+      return res.json({
+        success: true,
+        data: {
+          id: pkg.id,
+          type: 'PACKAGE',
+          code: pkg.packageCode,
+          customerName: pkg.senderName,
+          customerPhone: pkg.senderPhone,
+          serviceName: `Paket (${pkg.schedule?.route?.originCity?.name} → ${pkg.schedule?.route?.destinationCity?.name})`,
+          details: `${pkg.itemCount} Unit (${pkg.weightKg} Kg) - ${pkg.packageDescription}`,
+          totalPrice: pkg.totalPrice,
+          paymentMethod: pkg.paymentMethod,
+          status: pkg.status,
+          paidAt: pkg.paidAt || pkg.createdAt,
+          fullData: pkg
+        }
+      });
+    }
+
+    return res.status(404).json({ success: false, error: 'Transaksi tidak ditemukan' });
   } catch (error) {
-    console.error('Error fetching payment methods:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Gagal mengambil metode pembayaran'
-    });
+    console.error('Get payment by id error:', error);
+    res.status(500).json({ success: false, error: 'Gagal mengambil detail pembayaran' });
   }
 };
 
-// Get daily revenue report
 const getDailyRevenue = async (req, res) => {
-  try {
-    const { startDate, endDate } = req.query;
-    
-    const start = startDate ? new Date(startDate) : new Date(new Date().setDate(new Date().getDate() - 30));
-    const end = endDate ? new Date(endDate) : new Date();
-    end.setHours(23, 59, 59, 999);
+  res.json({ success: true, data: [] });
+};
 
-    const payments = await prisma.booking.findMany({
-      where: {
-        status: {
-          in: ['PAID', 'CONFIRMED']
-        },
-        paidAt: {
-          gte: start,
-          lte: end
-        }
-      },
-      select: {
-        paidAt: true,
-        totalPrice: true
-      },
-      orderBy: {
-        paidAt: 'asc'
-      }
-    });
-
-    // Group by date
-    const dailyRevenue = payments.reduce((acc, payment) => {
-      const date = new Date(payment.paidAt).toISOString().split('T')[0];
-      if (!acc[date]) {
-        acc[date] = {
-          date,
-          count: 0,
-          total: 0
-        };
-      }
-      acc[date].count++;
-      acc[date].total += payment.totalPrice;
-      return acc;
-    }, {});
-
-    const result = Object.values(dailyRevenue).sort((a, b) => 
-      new Date(a.date) - new Date(b.date)
-    );
-
-    res.json({
-      success: true,
-      data: result
-    });
-  } catch (error) {
-    console.error('Error fetching daily revenue:', error);
-    res.status(500).json({
-      success: false,
-      error: 'Gagal mengambil laporan pendapatan harian'
-    });
-  }
+const getPaymentMethods = async (req, res) => {
+  res.json({
+    success: true,
+    data: [
+      { id: 'TRANSFER', name: 'Bank Transfer / QRIS' },
+      { id: 'CASH', name: 'Cash / Tunai' }
+    ]
+  });
 };
 
 module.exports = {
   getPayments,
   getPaymentStats,
   getPaymentById,
-  getPaymentMethods,
-  getDailyRevenue
+  deletePayment,
+  getDailyRevenue,
+  getPaymentMethods
 };

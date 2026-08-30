@@ -67,6 +67,22 @@ function App() {
           } 
         />
         <Route 
+          path="/charter-armada" 
+          element={
+            <ProtectedRoute>
+              <Dashboard user={user} page="charter" />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/pengiriman-paket" 
+          element={
+            <ProtectedRoute>
+              <Dashboard user={user} page="paket" />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="/master-driver" 
           element={
             <ProtectedRoute>

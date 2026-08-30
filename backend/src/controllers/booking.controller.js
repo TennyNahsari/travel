@@ -13,7 +13,30 @@ const getBookings = async (req, res) => {
   try {
     const { status, search, userId } = req.query;
     
+    // Auto-cancel overdue PENDING bookings
+    const now = new Date();
+    await prisma.booking.updateMany({
+      where: {
+        status: 'PENDING',
+        OR: [
+          { paymentDeadline: { lt: now } },
+          { paymentDeadline: null, createdAt: { lt: new Date(now.getTime() - 60 * 60 * 1000) } }
+        ]
+      },
+      data: { status: 'CANCELLED' }
+    });
+
     const where = {};
+    
+    if (startDate || endDate) {
+      where.createdAt = {};
+      if (startDate) where.createdAt.gte = new Date(startDate);
+      if (endDate) {
+        const eDate = new Date(endDate);
+        eDate.setHours(23, 59, 59, 999);
+        where.createdAt.lte = eDate;
+      }
+    }
     
     // Filter by status
     if (status) {
@@ -318,7 +341,8 @@ const createBooking = async (req, res) => {
           passengerPhone: passengerPhone || null,
           passengerEmail: passengerEmail || null,
           passengerNik: passengerNik || null,
-          status: 'PENDING'
+          status: 'PENDING',
+          paymentDeadline: new Date(Date.now() + 60 * 60 * 1000)
         },
         include: {
           user: {

@@ -156,7 +156,20 @@ async function main() {
     let v = await prisma.vehicle.findUnique({ where: { plateNumber } });
     if (!v) {
       v = await prisma.vehicle.create({
-        data: { plateNumber, vehicleType, capacity, status, description, facilities, imageUrl }
+        data: {
+          plateNumber,
+          vehicleType,
+          capacity,
+          status,
+          description,
+          facilities,
+          imageUrl,
+          maxCharter: 2,
+          charterPrice: 1000000,
+          maxPackageCount: 5,
+          maxPackageWeight: 50,
+          packagePricePerKg: 10000
+        }
       });
     } else {
       v = await prisma.vehicle.update({

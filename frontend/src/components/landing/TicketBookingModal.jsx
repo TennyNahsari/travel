@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Bus, Calendar, MapPin, Users, Ticket, CheckCircle2, QrCode, ArrowRight, ShieldCheck, CreditCard, Clock, ChevronDown, Search } from 'lucide-react';
+import { X, Bus, Calendar, MapPin, Users, Ticket, CheckCircle2, QrCode, ArrowRight, ShieldCheck, CreditCard, Clock, ChevronDown, Search, Copy, Check } from 'lucide-react';
 import api, { authService, qrisService, getImageUrl } from '../../services/api';
 
 const getRowSeats = (rowIndex, rowsConfig) => {
@@ -34,6 +34,7 @@ const TicketBookingModal = ({ isOpen, onClose, initialOrigin = 'Jakarta', initia
   const [showSeatModal, setShowSeatModal] = useState(false);
   const [showPaymentInfo, setShowPaymentInfo] = useState(false);
   const [createdBookingInfo, setCreatedBookingInfo] = useState(null);
+  const [copiedCode, setCopiedCode] = useState(false);
   const [qrisData, setQrisData] = useState(null);
 
   useEffect(() => {
@@ -675,13 +676,41 @@ const TicketBookingModal = ({ isOpen, onClose, initialOrigin = 'Jakarta', initia
               <CheckCircle2 className="w-8 h-8 text-green-600 shrink-0" />
               <div>
                 <h2 className="text-lg font-extrabold text-gray-800">{t('booking.bookingSuccessTitle', 'Pemesanan Tiket Berhasil')}</h2>
-                <p className="text-xs text-gray-600">
-                  {t('dashboard.bookingCode')}: <span className="font-bold text-green-700 text-sm">{createdBookingInfo.bookingCode}</span>
-                </p>
+                <div className="flex flex-wrap items-center gap-2 mt-0.5">
+                  <span className="text-xs text-gray-600">{t('dashboard.bookingCode')}:</span>
+                  <span className="font-mono font-extrabold text-green-900 text-sm bg-white px-2.5 py-0.5 rounded-md border border-green-300">
+                    {createdBookingInfo.bookingCode}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(createdBookingInfo.bookingCode);
+                      setCopiedCode(true);
+                      setTimeout(() => setCopiedCode(false), 2000);
+                    }}
+                    className="px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-bold transition flex items-center gap-1 shrink-0"
+                    title="Salin Kode Booking"
+                  >
+                    {copiedCode ? <Check className="w-3.5 h-3.5 text-white" /> : <Copy className="w-3.5 h-3.5 text-white" />}
+                    <span>{copiedCode ? 'Tersalin!' : 'Salin Kode'}</span>
+                  </button>
+                </div>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
+              {/* Payment Deadline Alert */}
+              <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 flex items-center justify-between">
+                <span className="flex items-center gap-1.5">
+                  <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>⏰ Paling Telat Bayar:</span>
+                </span>
+                <span className="text-xs sm:text-sm font-extrabold text-amber-700 bg-white px-2.5 py-0.5 rounded-lg border border-amber-300">
+                  {createdBookingInfo.paymentDeadline 
+                    ? `${new Date(createdBookingInfo.paymentDeadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}, ${new Date(createdBookingInfo.paymentDeadline).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+                    : `${new Date(Date.now() + 60*60*1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`}
+                </span>
+              </div>
               {/* Order Details */}
               <div className="bg-blue-50/70 rounded-xl p-4 border border-blue-100 text-xs sm:text-sm space-y-2">
                 <h4 className="font-bold text-gray-800 text-xs uppercase tracking-wider mb-2">{t('booking.bookingDetail', 'Detail Pemesanan')}</h4>

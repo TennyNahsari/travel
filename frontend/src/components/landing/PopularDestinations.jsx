@@ -10,7 +10,7 @@ const fallbackImages = [
   'https://images.unsplash.com/photo-1493976040374-85c8e12f0c0e?auto=format&fit=crop&w=800&q=80',
 ];
 
-const PopularDestinations = ({ onOpenBookingModal }) => {
+const PopularDestinations = ({ onOpenBookingModal, onOpenCharterModal }) => {
   const { t } = useTranslation();
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -106,15 +106,20 @@ const PopularDestinations = ({ onOpenBookingModal }) => {
                         />
                         <div className="absolute inset-0 bg-gradient-to-t from-deep-navy/80 via-transparent to-transparent" />
 
-                        <div className="absolute top-3 left-3 z-10">
+                        <div className="absolute top-3 left-3 z-10 flex flex-col gap-1 items-start">
                           <span className="px-2.5 py-0.5 rounded-full bg-white/90 backdrop-blur-md text-[9px] font-extrabold text-deep-navy shadow-sm uppercase tracking-wider">
                             {vehicle.plateNumber}
                           </span>
+                          {vehicle.maxCharter > 0 && (
+                            <span className="px-2.5 py-0.5 rounded-full bg-amber-500 text-white text-[9px] font-extrabold shadow-sm uppercase tracking-wider">
+                              {t('vehicle.charterAvailable', '🚗 Bisa Charter (Max {{max}}/Hari)', { max: vehicle.maxCharter })}
+                            </span>
+                          )}
                         </div>
 
                         <div className="absolute bottom-3 left-3 right-3 text-white">
                           <span className="text-[9px] font-bold text-tropical-teal uppercase tracking-wider block">
-                            Kapasitas {vehicle.capacity} Kursi
+                            {t('vehicle.capacitySeats', 'Kapasitas {{count}} Kursi', { count: vehicle.capacity })}
                           </span>
                           <h3 className="text-base font-extrabold line-clamp-1">{vehicle.vehicleType}</h3>
                         </div>
@@ -127,7 +132,7 @@ const PopularDestinations = ({ onOpenBookingModal }) => {
                         </p>
 
                         <div className="space-y-1.5 pt-2 border-t border-slate-200/60">
-                          <p className="text-[10px] font-extrabold text-deep-navy uppercase tracking-wider">Fasilitas Utama:</p>
+                          <p className="text-[10px] font-extrabold text-deep-navy uppercase tracking-wider">{t('vehicle.mainFacilities', 'Fasilitas Utama:')}</p>
                           <div className="flex flex-wrap gap-1">
                             {facilitiesList.slice(0, 4).map((f, i) => (
                               <span key={i} className="text-[10px] font-semibold bg-white text-deep-navy border border-slate-200 px-1.5 py-0.5 rounded flex items-center gap-1">
@@ -139,6 +144,23 @@ const PopularDestinations = ({ onOpenBookingModal }) => {
                         </div>
                       </div>
                     </div>
+
+                    {/* Footer Actions */}
+                    {onOpenCharterModal && (
+                      <div className="p-4 pt-0 space-y-1">
+                        <button
+                          onClick={() => onOpenCharterModal(vehicle)}
+                          className="w-full py-2.5 bg-travel-blue hover:bg-travel-blue-hover text-white text-xs font-extrabold rounded-xl shadow-md transition-all flex items-center justify-center gap-1.5"
+                        >
+                          <Bus className="w-3.5 h-3.5" />
+                          <span>{t('charter.bookCharter', 'Sewa / Charter Armada')}</span>
+                        </button>
+                        <span className="block text-[10px] text-center text-slate-500 font-semibold">
+                          {t('vehicle.charterPriceInfo', 'Max {{max}} Mobil / Rp {{price}}/Hari', { max: vehicle.maxCharter > 0 ? vehicle.maxCharter : 2, price: (vehicle.charterPrice > 0 ? vehicle.charterPrice : 1000000).toLocaleString('id-ID') })}
+                        </span>
+                      </div>
+                    )}
+
                   </div>
                 );
               })}

@@ -14,6 +14,8 @@ import Footer from '../components/landing/Footer';
 import DownloadModal from '../components/landing/DownloadModal';
 import TicketBookingModal from '../components/landing/TicketBookingModal';
 import PaymentConfirmationModal from '../components/landing/PaymentConfirmationModal';
+import CharterBookingModal from '../components/landing/CharterBookingModal';
+import PackageBookingModal from '../components/landing/PackageBookingModal';
 
 const cleanWaNumber = (num) => {
   if (!num) return '6281234567890';
@@ -28,6 +30,10 @@ const LandingPage = () => {
   const navigate = useNavigate();
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
+  const [isCharterModalOpen, setIsCharterModalOpen] = useState(false);
+  const [selectedCharterVehicle, setSelectedCharterVehicle] = useState(null);
+  const [isPackageModalOpen, setIsPackageModalOpen] = useState(false);
+  const [selectedPackageSchedule, setSelectedPackageSchedule] = useState(null);
   const [isPaymentConfirmationModalOpen, setIsPaymentConfirmationModalOpen] = useState(false);
   const [bookingOrigin, setBookingOrigin] = useState('Jakarta (Pool Semanggi / Lebak Bulus)');
   const [bookingDestination, setBookingDestination] = useState('Bandung (Pool Pasteur / Dipatiukur)');
@@ -55,69 +61,63 @@ const LandingPage = () => {
     setIsBookingModalOpen(true);
   };
 
-  const targetWaNumber = cleanWaNumber(waNumber);
-  const waLink = `https://wa.me/${targetWaNumber}?text=${encodeURIComponent('Halo Admin Travel, saya ingin bertanya mengenai pemesanan tiket shuttle.')}`;
+  const handleOpenCharterModal = (vehicle = null) => {
+    setSelectedCharterVehicle(vehicle);
+    setIsCharterModalOpen(true);
+  };
+
+  const handleOpenPackageModal = (schedule = null) => {
+    setSelectedPackageSchedule(schedule);
+    setIsPackageModalOpen(true);
+  };
 
   return (
-    <div className="min-h-screen bg-soft-sky text-deep-navy font-sans selection:bg-travel-blue selection:text-white relative">
-      {/* 01. Navigation */}
+    <div className="min-h-screen bg-slate-50 font-sans text-deep-navy selection:bg-tropical-teal selection:text-white">
+      {/* Top Navbar */}
       <Navbar
-        onOpenBookingModal={handleOpenBookingModal}
+        onOpenBookingModal={() => handleOpenBookingModal()}
         onOpenPaymentConfirmationModal={() => setIsPaymentConfirmationModalOpen(true)}
-        onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
+        onOpenDownloadModal={() => setIsDownloadModalOpen(false)}
+        onOpenCharterModal={() => handleOpenCharterModal(null)}
       />
 
-      {/* 02. Hero Section */}
-      <HeroSection
-        onOpenBookingModal={handleOpenBookingModal}
-      />
+      {/* Main Content Sections */}
+      <main>
+        <HeroSection onOpenBookingModal={handleOpenBookingModal} />
+        
+        <DestinationDiscovery
+          onOpenBookingModal={handleOpenBookingModal}
+          onOpenPackageModal={handleOpenPackageModal}
+        />
+        
+        <PopularDestinations
+          onOpenBookingModal={handleOpenBookingModal}
+          onOpenCharterModal={handleOpenCharterModal}
+        />
+        
+        <FeaturesSection />
+        <TravelInspiration onOpenBookingModal={handleOpenBookingModal} />
+        <BenefitsSection />
+        <TestimonialSection />
+        <DownloadCtaSection onOpenDownloadModal={() => setIsDownloadModalOpen(true)} />
+      </main>
 
-      {/* 03. Rute Populer Antar Kota */}
-      <DestinationDiscovery
-        onOpenBookingModal={handleOpenBookingModal}
-      />
+      {/* Footer */}
+      <Footer />
 
-      {/* 04. Keunggulan Layanan Travel */}
-      <FeaturesSection />
-
-      {/* 05. Showcase Armada Eksekutif */}
-      <PopularDestinations
-        onOpenBookingModal={handleOpenBookingModal}
-      />
-
-      {/* 08. Informasi & Panduan Shuttle */}
-      <TravelInspiration />
-
-      {/* 09. Komitmen & Garansi Perjalanan */}
-      <BenefitsSection />
-
-      {/* 10. Testimoni & Statistik Penumpang */}
-      <TestimonialSection />
-
-      {/* 11. CTA Pemesanan Tiket */}
-      <DownloadCtaSection
-        onOpenBookingModal={handleOpenBookingModal}
-        onOpenDownloadModal={() => setIsDownloadModalOpen(true)}
-      />
-
-      {/* 12. Footer */}
-      <Footer
-        onOpenBookingModal={handleOpenBookingModal}
-      />
-
-      {/* Floating WhatsApp Button */}
+      {/* Floating Sticky CS WhatsApp Button */}
       <a
-        href={waLink}
+        href={`https://wa.me/${cleanWaNumber(waNumber)}?text=${encodeURIComponent('Halo Admin Travel Shuttle, saya ingin bertanya info jadwal / tiket / charter armada / kirim paket.')}`}
         target="_blank"
         rel="noopener noreferrer"
-        aria-label="Chat WhatsApp CS"
-        className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 bg-emerald-500 hover:bg-emerald-600 text-white font-bold px-4 py-3 rounded-full shadow-2xl hover:scale-105 transition-all duration-300 group border-2 border-white/30"
+        className="fixed bottom-6 right-6 z-40 bg-emerald-500 hover:bg-emerald-600 text-white p-3.5 sm:px-5 sm:py-3.5 rounded-full shadow-2xl hover:shadow-emerald-500/40 transition-all transform hover:-translate-y-1 active:translate-y-0 flex items-center gap-2.5 font-bold border-2 border-white/20"
+        title="Chat Customer Service via WhatsApp"
       >
         <div className="relative">
           <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
             <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-1.099 4.018 4.018-1.099z" />
           </svg>
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+          <span className="flex h-3 w-3 absolute -top-1 -right-1">
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-300 opacity-75"></span>
             <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-200"></span>
           </span>
@@ -132,6 +132,18 @@ const LandingPage = () => {
         initialOrigin={bookingOrigin}
         initialDestination={bookingDestination}
         initialScheduleId={selectedScheduleId}
+      />
+
+      <CharterBookingModal
+        isOpen={isCharterModalOpen}
+        onClose={() => setIsCharterModalOpen(false)}
+        initialVehicle={selectedCharterVehicle}
+      />
+
+      <PackageBookingModal
+        isOpen={isPackageModalOpen}
+        onClose={() => setIsPackageModalOpen(false)}
+        initialSchedule={selectedPackageSchedule}
       />
 
       <PaymentConfirmationModal

@@ -120,12 +120,22 @@ const Navbar = ({ onOpenBookingModal, onOpenPaymentConfirmationModal }) => {
             <button
               onClick={() => {
                 setMobileMenuOpen(false);
-                onOpenBookingModal();
+                onOpenPaymentConfirmationModal && onOpenPaymentConfirmationModal();
+              }}
+              className="flex items-center justify-center gap-2 w-full px-4 py-3 text-sm font-bold text-travel-blue border border-travel-blue/30 bg-travel-blue/5 hover:bg-travel-blue/10 rounded-xl transition-colors"
+            >
+              <CreditCard className="w-4 h-4" />
+              <span>{t('landing.nav.checkPayment', 'Cek Pembayaran')}</span>
+            </button>
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                onOpenBookingModal && onOpenBookingModal();
               }}
               className="flex items-center justify-center gap-2 w-full px-4 py-3 text-base font-bold text-white bg-travel-blue hover:bg-travel-blue-hover rounded-xl shadow-md transition-colors"
             >
               <Ticket className="w-5 h-5 text-sunset-orange" />
-              {t('landing.nav.bookNow', 'Pesan Tiket Online')}
+              <span>{t('landing.nav.bookNow', 'Pesan Tiket Online')}</span>
             </button>
           </div>
         </div>

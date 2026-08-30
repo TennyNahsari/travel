@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Bus, MapPin, Clock, ArrowRight, Filter, Ticket, ChevronLeft, ChevronRight, Calendar, RefreshCw, Search } from 'lucide-react';
+import { Bus, MapPin, Clock, ArrowRight, Filter, Ticket, ChevronLeft, ChevronRight, Calendar, RefreshCw, Search, Package } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import api from '../../services/api';
 
@@ -27,7 +27,7 @@ const formatRupiah = (number) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(number || 0);
 };
 
-const DestinationDiscovery = ({ searchQuery = '', onOpenBookingModal }) => {
+const DestinationDiscovery = ({ searchQuery = '', onOpenBookingModal, onOpenPackageModal }) => {
   const { t } = useTranslation();
   const [schedules, setSchedules] = useState([]);
   const [selectedDate, setSelectedDate] = useState('');
@@ -194,13 +194,13 @@ const DestinationDiscovery = ({ searchQuery = '', onOpenBookingModal }) => {
                       {/* Seat Badge */}
                       <div className="absolute top-3 left-3 z-10">
                         <span className="px-2.5 py-1 rounded-full bg-emerald-500 text-white text-[10px] font-extrabold shadow-sm uppercase tracking-wider">
-                          Sisa {sch.availableSeats}/{sch.vehicle?.capacity || 14} Kursi
+                          {t('schedule.seatsRemaining', 'Sisa {{available}}/{{capacity}} Kursi', { available: sch.availableSeats, capacity: sch.vehicle?.capacity || 14 })}
                         </span>
                       </div>
 
                       {/* Price Tag */}
                       <div className="absolute bottom-3 right-3 bg-travel-blue text-white px-3 py-1 rounded-xl text-xs font-extrabold shadow-md">
-                        {formatRupiah(sch.ticketPrice)} / kursi
+                        {formatRupiah(sch.ticketPrice)} / {t('schedule.seatUnit', 'kursi')}
                       </div>
 
                       {/* Route Title on Image */}
@@ -227,36 +227,52 @@ const DestinationDiscovery = ({ searchQuery = '', onOpenBookingModal }) => {
 
                         <div className="bg-soft-sky p-3 rounded-xl space-y-1.5 text-[11px] text-slate-gray">
                           <p className="flex items-center gap-1">
-                            📅 <strong className="text-deep-navy">Keberangkatan:</strong> {formatDate(sch.departureDate)}
+                            📅 <strong className="text-deep-navy">{t('schedule.departure', 'Keberangkatan:')}</strong> {formatDate(sch.departureDate)}
                           </p>
                           <p className="flex items-center gap-1">
-                            📍 <strong className="text-deep-navy">Rute:</strong> {originName} → {destName}
+                            📍 <strong className="text-deep-navy">{t('schedule.route', 'Rute:')}</strong> {originName} → {destName}
                           </p>
                           {sch.poolOrigin && (
                             <p className="flex items-center gap-1">
-                              🏢 <strong className="text-deep-navy">Pool Asal:</strong> {sch.poolOrigin}
+                              🏢 <strong className="text-deep-navy">{t('schedule.originPool', 'Pool Asal:')}</strong> {sch.poolOrigin}
                             </p>
                           )}
                           {sch.poolDestination && (
                             <p className="flex items-center gap-1">
-                              🏁 <strong className="text-deep-navy">Pool Tujuan:</strong> {sch.poolDestination}
+                              🏁 <strong className="text-deep-navy">{t('schedule.destinationPool', 'Pool Tujuan:')}</strong> {sch.poolDestination}
                             </p>
                           )}
                           {sch.driver?.user?.name && (
                             <p className="flex items-center gap-1">
-                              👤 <strong className="text-deep-navy">Driver:</strong> {sch.driver.user.name}
+                              👤 <strong className="text-deep-navy">{t('schedule.driver', 'Driver:')}</strong> {sch.driver.user.name}
                             </p>
                           )}
                         </div>
                       </div>
 
                       {/* Action CTA */}
-                      <div className="pt-3 border-t border-slate-100 flex items-center justify-between text-xs font-bold text-travel-blue group-hover:text-travel-blue-dark">
-                        <span className="flex items-center gap-1.5">
-                          <Ticket className="w-4 h-4 text-sunset-orange" />
-                          Pesan Tiket Schedule Ini
-                        </span>
-                        <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
+                      <div className="pt-3 border-t border-slate-100 space-y-2">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenBookingModal && onOpenBookingModal(originName, destName, sch.id);
+                          }}
+                          className="w-full py-2 bg-travel-blue hover:bg-travel-blue-hover text-white text-xs font-extrabold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                        >
+                          <Ticket className="w-3.5 h-3.5 text-sunset-orange" />
+                          <span>{t('schedule.bookTicket', 'Pesan Tiket Shuttle')}</span>
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPackageModal && onOpenPackageModal(sch);
+                          }}
+                          className="w-full py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-extrabold rounded-xl shadow-xs transition flex items-center justify-center gap-1.5"
+                        >
+                          <Package className="w-3.5 h-3.5" />
+                          <span>{t('package.bookPackage', '📦 Kirim Paket')}</span>
+                        </button>
                       </div>
                     </div>
                   </div>

@@ -19,7 +19,11 @@ router.get('/methods', paymentController.getPaymentMethods);
 // Get all payments
 router.get('/', paymentController.getPayments);
 
-// Get payment by booking ID
+// Delete payment transaction
+router.delete('/:type/:id', paymentController.deletePayment);
+router.delete('/:id', paymentController.deletePayment);
+
+// Get payment by ID
 router.get('/:id', paymentController.getPaymentById);
 
 module.exports = router;

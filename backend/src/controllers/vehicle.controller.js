@@ -53,7 +53,7 @@ exports.getVehicleById = async (req, res) => {
 // Create vehicle
 exports.createVehicle = async (req, res) => {
   try {
-    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl } = req.body;
+    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl, maxCharter, charterPrice, maxPackageCount, maxPackageWeight, packagePricePerKg } = req.body;
 
     // Validation
     if (!plateNumber || !vehicleType || !seatTemplateId) {
@@ -98,6 +98,11 @@ exports.createVehicle = async (req, res) => {
         description: description || null,
         facilities: parsedFacilities || null,
         imageUrl: imageUrl || null,
+        maxCharter: maxCharter !== undefined ? parseInt(maxCharter, 10) || 0 : 0,
+        charterPrice: charterPrice !== undefined ? parseInt(charterPrice, 10) || 0 : 0,
+        maxPackageCount: maxPackageCount !== undefined ? parseInt(maxPackageCount, 10) || 0 : 0,
+        maxPackageWeight: maxPackageWeight !== undefined ? parseInt(maxPackageWeight, 10) || 0 : 0,
+        packagePricePerKg: packagePricePerKg !== undefined ? parseInt(packagePricePerKg, 10) || 0 : 0,
         status: status || 'ACTIVE'
       },
       include: {
@@ -119,7 +124,7 @@ exports.createVehicle = async (req, res) => {
 exports.updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
-    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl } = req.body;
+    const { plateNumber, vehicleType, seatTemplateId, status, description, facilities, imageUrl, maxCharter, charterPrice, maxPackageCount, maxPackageWeight, packagePricePerKg } = req.body;
 
     // Validation
     if (!plateNumber || !vehicleType || !seatTemplateId) {
@@ -176,6 +181,11 @@ exports.updateVehicle = async (req, res) => {
         description: description !== undefined ? description : existingVehicle.description,
         facilities: parsedFacilities !== undefined ? parsedFacilities : existingVehicle.facilities,
         imageUrl: imageUrl !== undefined ? imageUrl : existingVehicle.imageUrl,
+        maxCharter: maxCharter !== undefined ? parseInt(maxCharter, 10) || 0 : existingVehicle.maxCharter,
+        charterPrice: charterPrice !== undefined ? parseInt(charterPrice, 10) || 0 : existingVehicle.charterPrice,
+        maxPackageCount: maxPackageCount !== undefined ? parseInt(maxPackageCount, 10) || 0 : existingVehicle.maxPackageCount,
+        maxPackageWeight: maxPackageWeight !== undefined ? parseInt(maxPackageWeight, 10) || 0 : existingVehicle.maxPackageWeight,
+        packagePricePerKg: packagePricePerKg !== undefined ? parseInt(packagePricePerKg, 10) || 0 : existingVehicle.packagePricePerKg,
         status: status || 'ACTIVE'
       },
       include: {

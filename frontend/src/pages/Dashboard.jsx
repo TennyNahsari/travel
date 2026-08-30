@@ -16,6 +16,8 @@ import CheckIn from './CheckIn';
 import Laporan from './Laporan';
 import PengaturanQris from './PengaturanQris';
 import PengaturanSosmed from './PengaturanSosmed';
+import CharterArmada from './CharterArmada';
+import PengirimanPaket from './PengirimanPaket';
 import AIPrediction from '../components/AIPrediction';
 
 function Dashboard({ user, page = 'dashboard' }) {
@@ -62,6 +64,12 @@ function Dashboard({ user, page = 'dashboard' }) {
         break;
       case 'armada':
         navigate('/master-armada');
+        break;
+      case 'charter':
+        navigate('/charter-armada');
+        break;
+      case 'paket':
+        navigate('/pengiriman-paket');
         break;
       case 'driver':
         navigate('/master-driver');
@@ -133,6 +141,8 @@ function Dashboard({ user, page = 'dashboard' }) {
       },
       { id: 'jadwal', label: t('sidebar.travelSchedule'), icon: '📅', roles: ['ADMIN', 'OPERATOR', 'DRIVER'] },
       { id: 'booking', label: t('sidebar.bookingTicket'), icon: '🎫', roles: ['ADMIN', 'OPERATOR', 'CUSTOMER'] },
+      { id: 'charter', label: t('sidebar.charterArmada', 'Charter Armada'), icon: '🚗', roles: ['ADMIN', 'OPERATOR'] },
+      { id: 'paket', label: t('sidebar.packageDelivery', 'Pengiriman Paket'), icon: '📦', roles: ['ADMIN', 'OPERATOR'] },
       { id: 'pembayaran', label: t('sidebar.payment'), icon: '💳', roles: ['ADMIN', 'OPERATOR'] },
       { id: 'checkin', label: t('sidebar.checkIn'), icon: '✅', roles: ['ADMIN', 'OPERATOR', 'DRIVER'] },
       { id: 'laporan', label: t('sidebar.reports'), icon: '📈', roles: ['ADMIN', 'OPERATOR'] },
@@ -341,6 +351,8 @@ function Dashboard({ user, page = 'dashboard' }) {
           {activeMenu === 'template-kursi' && <MasterTemplateKursi />}
           {activeMenu === 'jadwal' && <JadwalPerjalanan />}
           {activeMenu === 'booking' && <BookingTiket />}
+          {activeMenu === 'charter' && <CharterArmada />}
+          {activeMenu === 'paket' && <PengirimanPaket />}
           {activeMenu === 'pembayaran' && <Pembayaran />}
           {activeMenu === 'qris' && <PengaturanQris />}
           {activeMenu === 'sosmed' && <PengaturanSosmed />}
@@ -460,7 +472,7 @@ function Dashboard({ user, page = 'dashboard' }) {
             </>
           )}
 
-          {!['dashboard', 'kota', 'rute', 'armada', 'driver', 'jadwal', 'booking', 'pembayaran', 'checkin', 'laporan', 'users', 'template-kursi', 'qris', 'sosmed'].includes(activeMenu) && (
+          {!['dashboard', 'kota', 'rute', 'armada', 'driver', 'jadwal', 'booking', 'charter', 'paket', 'pembayaran', 'checkin', 'laporan', 'users', 'template-kursi', 'qris', 'sosmed'].includes(activeMenu) && (
             <div className="bg-white rounded-3xl shadow-soft p-12 text-center border border-slate-100">
               <div className="text-6xl mb-4">🚧</div>
               <h2 className="text-2xl font-bold text-deep-navy mb-2">{t('dashboard.comingSoon')}</h2>

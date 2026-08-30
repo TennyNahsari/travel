@@ -18,6 +18,8 @@ const scheduleTemplateRoutes = require('./routes/scheduleTemplate.routes');
 const mlRoutes = require('./routes/ml.routes');
 const qrisRoutes = require('./routes/qris.routes');
 const socialRoutes = require('./routes/social.routes');
+const charterRoutes = require('./routes/charter.routes');
+const packageRoutes = require('./routes/package.routes');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -52,6 +54,8 @@ app.use('/api/schedule-templates', scheduleTemplateRoutes);
 app.use('/api/ml', mlRoutes);
 app.use('/api/qris', qrisRoutes);
 app.use('/api/social', socialRoutes);
+app.use('/api/charters', charterRoutes);
+app.use('/api/packages', packageRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {

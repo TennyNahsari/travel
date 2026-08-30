@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { X, Search, CreditCard, CheckCircle2, AlertCircle, Image, Building2, User, DollarSign, Calendar, MapPin, Bus, FileText, QrCode } from 'lucide-react';
+import { X, Search, CreditCard, CheckCircle2, AlertCircle, Image, Building2, User, DollarSign, Calendar, MapPin, Bus, FileText, QrCode, Copy, Check, Clock } from 'lucide-react';
 import api, { qrisService, getImageUrl } from '../../services/api';
 
 const formatCurrency = (val) => {
@@ -27,6 +27,9 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
   const [error, setError] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [qrisData, setQrisData] = useState(null);
+  const [isCharter, setIsCharter] = useState(false);
+  const [isPackage, setIsPackage] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
 
   useEffect(() => {
     const fetchQris = async () => {
@@ -58,8 +61,9 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
 
   const handleSearchBooking = async (e) => {
     if (e) e.preventDefault();
-    if (!searchCode.trim()) {
-      setError(t('booking.enterBookingCode', 'Masukkan Kode Booking terlebih dahulu'));
+    const trimmed = searchCode.trim();
+    if (!trimmed) {
+      setError(t('booking.enterBookingCode', 'Masukkan Kode Booking / Charter terlebih dahulu'));
       return;
     }
 
@@ -67,12 +71,65 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
     setError('');
     setSuccessMessage('');
     setBookingData(null);
+    setIsCharter(false);
+    setIsPackage(false);
+
+    const isCharterCode = trimmed.toUpperCase().startsWith('CTR');
+    const isPackageCode = trimmed.toUpperCase().startsWith('PKG');
+
+    if (isPackageCode) {
+      try {
+        const res = await api.get(`/packages/public/code/${trimmed}`);
+        if (res.data?.data) {
+          const pkg = res.data.data;
+          setBookingData(pkg);
+          setIsPackage(true);
+          setForm({
+            senderName: pkg.paymentSenderName || pkg.senderName || '',
+            bankName: pkg.paymentBankName || 'BCA',
+            targetBank: pkg.paymentTargetBank || 'PT Travel Shuttle Indonesia (BCA)',
+            transferAmount: pkg.paymentAmount || pkg.totalPrice || '',
+            paymentProofUrl: pkg.paymentProofUrl || '',
+            notes: pkg.paymentNotes || ''
+          });
+          setSearching(false);
+          return;
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
+
+    if (isCharterCode) {
+      try {
+        const res = await api.get(`/charters/public/code/${trimmed}`);
+        if (res.data?.data) {
+          const charter = res.data.data;
+          setBookingData(charter);
+          setIsCharter(true);
+          setForm({
+            senderName: charter.paymentSenderName || charter.customerName || '',
+            bankName: charter.paymentBankName || 'BCA',
+            targetBank: charter.paymentTargetBank || 'PT Travel Shuttle Indonesia (BCA)',
+            transferAmount: charter.paymentAmount || charter.totalPrice || '',
+            paymentProofUrl: charter.paymentProofUrl || '',
+            notes: charter.paymentNotes || ''
+          });
+          setSearching(false);
+          return;
+        }
+      } catch (e) {
+        // Fallback
+      }
+    }
 
     try {
-      const res = await api.get(`/bookings/public/code/${searchCode.trim()}`);
+      const res = await api.get(`/bookings/public/code/${trimmed}`);
       if (res.data && res.data.success && res.data.data) {
         const booking = res.data.data;
         setBookingData(booking);
+        setIsCharter(false);
+        setIsPackage(false);
         setForm({
           senderName: booking.paymentSenderName || booking.passengerName || '',
           bankName: booking.paymentBankName || 'BCA',
@@ -82,11 +139,45 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
           notes: booking.paymentNotes || ''
         });
       } else {
-        setError(res.data?.error || t('booking.codeNotFound', 'Kode Booking tidak ditemukan.'));
+        // Try charter or package
+        const pRes = await api.get(`/packages/public/code/${trimmed}`);
+        if (pRes.data?.data) {
+          const pkg = pRes.data.data;
+          setBookingData(pkg);
+          setIsPackage(true);
+          setForm({
+            senderName: pkg.paymentSenderName || pkg.senderName || '',
+            bankName: pkg.paymentBankName || 'BCA',
+            targetBank: pkg.paymentTargetBank || 'PT Travel Shuttle Indonesia (BCA)',
+            transferAmount: pkg.paymentAmount || pkg.totalPrice || '',
+            paymentProofUrl: pkg.paymentProofUrl || '',
+            notes: pkg.paymentNotes || ''
+          });
+        } else {
+          setError('Kode Booking / Charter / Paket tidak ditemukan.');
+        }
       }
     } catch (err) {
-      console.error('Error searching booking code:', err);
-      setError(err.response?.data?.error || t('booking.codeNotFound', 'Kode Booking tidak ditemukan. Silakan periksa kembali.'));
+      try {
+        const pRes = await api.get(`/packages/public/code/${trimmed}`);
+        if (pRes.data?.data) {
+          const pkg = pRes.data.data;
+          setBookingData(pkg);
+          setIsPackage(true);
+          setForm({
+            senderName: pkg.paymentSenderName || pkg.senderName || '',
+            bankName: pkg.paymentBankName || 'BCA',
+            targetBank: pkg.paymentTargetBank || 'PT Travel Shuttle Indonesia (BCA)',
+            transferAmount: pkg.paymentAmount || pkg.totalPrice || '',
+            paymentProofUrl: pkg.paymentProofUrl || '',
+            notes: pkg.paymentNotes || ''
+          });
+        } else {
+          setError('Kode Booking / Charter / Paket tidak ditemukan. Silakan periksa kembali.');
+        }
+      } catch (pErr) {
+        setError('Kode Booking / Charter / Paket tidak ditemukan. Silakan periksa kembali.');
+      }
     } finally {
       setSearching(false);
     }
@@ -106,25 +197,59 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
     setSuccessMessage('');
 
     try {
-      const payload = {
-        bookingCode: bookingData.bookingCode,
-        senderName: form.senderName,
-        bankName: form.bankName,
-        targetBank: form.targetBank,
-        transferAmount: form.transferAmount ? parseInt(form.transferAmount) : bookingData.totalPrice,
-        paymentProofUrl: form.paymentProofUrl || null,
-        notes: form.notes
-      };
-
-      const res = await api.post('/bookings/public/confirm-payment', payload);
-      if (res.data && res.data.success) {
-        setSuccessMessage(res.data.message || t('booking.confirmSuccess', 'Konfirmasi pembayaran berhasil dikirim! Staf kami akan segera memverifikasi.'));
-        setBookingData(res.data.data);
-        setTimeout(() => {
-          onClose();
-        }, 1500);
+      if (isPackage) {
+        const res = await api.post(`/packages/public/confirm-payment/${bookingData.id}`, {
+          paymentSenderName: form.senderName,
+          paymentBankName: form.bankName,
+          paymentTargetBank: form.targetBank,
+          paymentAmount: form.transferAmount ? parseInt(form.transferAmount) : bookingData.totalPrice,
+          paymentProofUrl: form.paymentProofUrl || null,
+          paymentNotes: form.notes
+        });
+        if (res.data?.data) {
+          setSuccessMessage('Konfirmasi pembayaran pengiriman paket berhasil dikirim! Staf kami akan segera memverifikasi.');
+          setBookingData(res.data.data);
+          setTimeout(() => {
+            onClose();
+          }, 1500);
+        }
+      } else if (isCharter) {
+        const res = await api.post(`/charters/public/confirm-payment/${bookingData.id}`, {
+          paymentSenderName: form.senderName,
+          paymentBankName: form.bankName,
+          paymentTargetBank: form.targetBank,
+          paymentAmount: form.transferAmount ? parseInt(form.transferAmount) : bookingData.totalPrice,
+          paymentProofUrl: form.paymentProofUrl || null,
+          paymentNotes: form.notes
+        });
+        if (res.data?.data) {
+          setSuccessMessage('Konfirmasi pembayaran charter berhasil dikirim! Staf kami akan segera memverifikasi.');
+          setBookingData(res.data.data);
+          setTimeout(() => {
+            onClose();
+          }, 1500);
+        }
       } else {
-        setError(res.data?.error || t('booking.confirmFailed', 'Gagal mengonfirmasi pembayaran.'));
+        const payload = {
+          bookingCode: bookingData.bookingCode,
+          senderName: form.senderName,
+          bankName: form.bankName,
+          targetBank: form.targetBank,
+          transferAmount: form.transferAmount ? parseInt(form.transferAmount) : bookingData.totalPrice,
+          paymentProofUrl: form.paymentProofUrl || null,
+          notes: form.notes
+        };
+
+        const res = await api.post('/bookings/public/confirm-payment', payload);
+        if (res.data && res.data.success) {
+          setSuccessMessage(res.data.message || t('booking.confirmSuccess', 'Konfirmasi pembayaran berhasil dikirim! Staf kami akan segera memverifikasi.'));
+          setBookingData(res.data.data);
+          setTimeout(() => {
+            onClose();
+          }, 1500);
+        } else {
+          setError(res.data?.error || t('booking.confirmFailed', 'Gagal mengonfirmasi pembayaran.'));
+        }
       }
     } catch (err) {
       console.error('Error submitting payment confirmation:', err);
@@ -181,26 +306,34 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
   };
 
   const getWaLink = () => {
-    if (!bookingData) return '#';
-    const rawNumber = import.meta.env.VITE_WA_NUMBER || '6281234567890';
-    const waNumber = rawNumber.replace(/[^0-9]/g, '');
+    const rawNum = qrisData?.waNumber || import.meta.env.VITE_WA_NUMBER || '6281234567890';
+    let clean = rawNum.replace(/\D/g, '');
+    if (clean.startsWith('0')) clean = '62' + clean.slice(1);
+    if (!clean) clean = '6281234567890';
 
-    const text =
-      `*KONFIRMASI PEMBAYARAN TIKET TRAVEL*\n` +
-      `----------------------------------\n` +
-      `• *Kode Booking:* ${bookingData.bookingCode}\n` +
-      `• *Nama Pemesan:* ${bookingData.passengerName || bookingData.user?.name || '-'}\n` +
-      `• *No. WhatsApp:* ${bookingData.passengerPhone || '-'}\n` +
-      `• *Rute Perjalanan:* ${bookingData.schedule?.route?.originCity?.name || ''} → ${bookingData.schedule?.route?.destinationCity?.name || ''}\n` +
-      `• *Waktu Keberangkatan:* ${formatDate(bookingData.schedule?.departureDate, t('common.locale'))} (${bookingData.schedule?.departureTime})\n` +
-      `• *Nomor Kursi:* ${(bookingData.seatNumbers || []).join(', ')}\n` +
-      `• *Total Tagihan:* ${formatCurrency(bookingData.totalPrice)}\n` +
-      `• *Bank Asal:* ${form.bankName || '-'}\n` +
-      `• *Nama Rekening Pengirim:* ${form.senderName || '-'}\n` +
-      `----------------------------------\n` +
-      `Halo Admin, saya sudah melakukan konfirmasi pembayaran tiket. Mohon bantuannya untuk memverifikasi. Terima kasih!`;
+    let msg = '';
+    if (isCharter && bookingData) {
+      msg = `Halo Admin Travel, saya ingin konfirmasi pembayaran charter armada:\n` +
+        `- Kode Charter: ${bookingData.charterCode}\n` +
+        `- Pemesan: ${bookingData.customerName} (${bookingData.customerPhone})\n` +
+        `- Armada: ${bookingData.vehicle?.vehicleType || ''}\n` +
+        `- Total Bayar: Rp ${(bookingData.totalPrice || 0).toLocaleString('id-ID')}\n` +
+        `- Bank Asal: ${form.bankName || '-'}\n` +
+        `- Nama Pengirim: ${form.senderName || '-'}\n\n` +
+        `Berikut bukti transfer pembayaran saya. Mohon diproses. Terima kasih.`;
+    } else if (bookingData) {
+      msg = `Halo Admin Travel, saya ingin konfirmasi pembayaran tiket:\n` +
+        `- Kode Booking: ${bookingData.bookingCode}\n` +
+        `- Penumpang: ${bookingData.passengerName || bookingData.user?.name || '-'}\n` +
+        `- Total Bayar: Rp ${(bookingData.totalPrice || 0).toLocaleString('id-ID')}\n` +
+        `- Bank Asal: ${form.bankName || '-'}\n` +
+        `- Nama Pengirim: ${form.senderName || '-'}\n\n` +
+        `Berikut bukti transfer pembayaran saya. Mohon diproses. Terima kasih.`;
+    } else {
+      msg = `Halo Admin Travel, saya ingin mengonfirmasi pembayaran tiket / charter armada.`;
+    }
 
-    return `https://wa.me/${waNumber}?text=${encodeURIComponent(text)}`;
+    return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
   };
 
   return (
@@ -317,55 +450,147 @@ const PaymentConfirmationModal = ({ isOpen, onClose, initialBookingCode = '' }) 
               <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 space-y-3">
                 <div className="flex flex-wrap justify-between items-center pb-3 border-b border-slate-200 gap-2">
                   <div>
-                    <span className="text-[11px] text-gray-500 font-bold block uppercase">{t('dashboard.bookingCode', 'Kode Booking')}</span>
-                    <span className="text-base font-extrabold text-blue-900 font-mono tracking-wider">{bookingData.bookingCode}</span>
+                    <span className="text-[11px] text-gray-500 font-bold block uppercase">
+                      {isPackage ? t('package.packageCode', 'Kode Tracking Paket') : isCharter ? t('charter.charterCode', 'Kode Charter Armada') : t('dashboard.bookingCode', 'Kode Booking Tiket')}
+                    </span>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-base font-extrabold text-blue-900 font-mono tracking-wider">
+                        {isPackage ? bookingData.packageCode : isCharter ? bookingData.charterCode : bookingData.bookingCode}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const codeToCopy = isPackage ? bookingData.packageCode : isCharter ? bookingData.charterCode : bookingData.bookingCode;
+                          navigator.clipboard.writeText(codeToCopy);
+                          setCopiedCode(true);
+                          setTimeout(() => setCopiedCode(false), 2000);
+                        }}
+                        className="px-2 py-0.5 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded border border-blue-200 text-[10px] font-bold flex items-center gap-1 transition"
+                        title={t('package.copyCode', 'Salin Kode')}
+                      >
+                        {copiedCode ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                        <span>{copiedCode ? t('package.codeCopied', 'Tersalin!') : t('package.copyCode', 'Salin')}</span>
+                      </button>
+                    </div>
                   </div>
                   <div>
                     <span className={`px-3 py-1 rounded-full text-xs font-bold ${
                       bookingData.status === 'PAID' || bookingData.status === 'CONFIRMED'
                         ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : bookingData.status === 'PROCESSED'
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
                         : bookingData.status === 'CANCELLED'
                         ? 'bg-red-100 text-red-800 border border-red-300'
                         : 'bg-amber-100 text-amber-800 border border-amber-300'
                     }`}>
-                      {bookingData.status === 'PAID' ? '✓ Dikonfirmasi Lunas' :
-                       bookingData.status === 'CONFIRMED' ? '✓ Terkonfirmasi' :
-                       bookingData.status === 'CANCELLED' ? '❌ Dibatalkan' : '⏳ Menunggu Verifikasi Pembayaran'}
+                      {bookingData.status === 'PAID' ? `✓ ${t('booking.status.PAID', 'Dikonfirmasi Lunas')}` :
+                       bookingData.status === 'CONFIRMED' ? `✓ ${t('booking.status.CONFIRMED', 'Terkonfirmasi')}` :
+                       bookingData.status === 'PROCESSED' ? `⚙️ ${t('package.status.PROCESSED', 'Sedang Diproses')}` :
+                       bookingData.status === 'CANCELLED' ? `❌ ${t('booking.status.CANCELLED', 'Dibatalkan')}` : `⏳ ${t('booking.status.PENDING', 'Menunggu Pembayaran')}`}
                     </span>
                   </div>
                 </div>
 
+                {/* Payment Deadline Alert Banner */}
+                {(bookingData.status === 'PENDING' || bookingData.paymentDeadline) && (
+                  <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Clock className="w-4 h-4 text-amber-600 shrink-0" />
+                      <span>⏰ {t('package.paymentDeadline', 'Batas Waktu Bayar')}:</span>
+                    </span>
+                    <span className="text-xs sm:text-sm font-extrabold text-amber-700 bg-white px-2.5 py-0.5 rounded-lg border border-amber-300">
+                      {bookingData.paymentDeadline
+                        ? `${new Date(bookingData.paymentDeadline).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}, ${new Date(bookingData.paymentDeadline).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`
+                        : `${new Date(new Date(bookingData.createdAt).getTime() + 60*60*1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB`}
+                    </span>
+                  </div>
+                )}
+
                 {/* Details */}
-                <div className="grid grid-cols-2 gap-2.5 text-xs text-gray-700">
-                  <div>
-                    <span className="text-gray-500 block">Pemesan / Penumpang:</span>
-                    <strong className="text-gray-900">{bookingData.passengerName || bookingData.user?.name || '-'}</strong>
+                {isPackage ? (
+                  <div className="grid grid-cols-2 gap-2.5 text-xs text-gray-700">
+                    <div>
+                      <span className="text-gray-500 block">Pengirim:</span>
+                      <strong className="text-gray-900">{bookingData.senderName} ({bookingData.senderPhone})</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Penerima:</span>
+                      <strong className="text-gray-900">{bookingData.recipientName} ({bookingData.recipientPhone})</strong>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">Deskripsi & Berat:</span>
+                      <strong className="text-gray-900">{bookingData.packageDescription} ({bookingData.weightKg} Kg, {bookingData.itemCount} Paket)</strong>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">Alamat Tujuan:</span>
+                      <strong className="text-gray-900">{bookingData.recipientAddress}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Total Tagihan:</span>
+                      <strong className="text-amber-700 font-extrabold text-sm">{formatCurrency(bookingData.totalPrice)}</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-500 block">No. WhatsApp:</span>
-                    <strong className="text-gray-900">{bookingData.passengerPhone || bookingData.user?.phone || '-'}</strong>
+                ) : isCharter ? (
+                  <div className="grid grid-cols-2 gap-2.5 text-xs text-gray-700">
+                    <div>
+                      <span className="text-gray-500 block">Pemesan:</span>
+                      <strong className="text-gray-900">{bookingData.customerName}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">No. WhatsApp:</span>
+                      <strong className="text-gray-900">{bookingData.customerPhone}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Armada Kendaraan:</span>
+                      <strong className="text-gray-900">{bookingData.vehicle?.vehicleType} ({bookingData.vehicle?.plateNumber})</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Tanggal & Durasi:</span>
+                      <strong className="text-gray-900">
+                        {new Date(bookingData.charterDate).toLocaleDateString('id-ID')} ({bookingData.durationDays} Hari, {bookingData.totalVehicles} Mobil)
+                      </strong>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-gray-500 block">Rute / Alamat:</span>
+                      <strong className="text-gray-900">{bookingData.originAddress} → {bookingData.destinationAddress}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Total Tagihan:</span>
+                      <strong className="text-emerald-700 font-extrabold text-sm">{formatCurrency(bookingData.totalPrice)}</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-500 block">Rute Perjalanan:</span>
-                    <strong className="text-gray-900">
-                      {bookingData.schedule?.route?.originCity?.name} → {bookingData.schedule?.route?.destinationCity?.name}
-                    </strong>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2.5 text-xs text-gray-700">
+                    <div>
+                      <span className="text-gray-500 block">Pemesan / Penumpang:</span>
+                      <strong className="text-gray-900">{bookingData.passengerName || bookingData.user?.name || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">No. WhatsApp:</span>
+                      <strong className="text-gray-900">{bookingData.passengerPhone || bookingData.user?.phone || '-'}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Rute Perjalanan:</span>
+                      <strong className="text-gray-900">
+                        {bookingData.schedule?.route?.originCity?.name} → {bookingData.schedule?.route?.destinationCity?.name}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Waktu Berangkat:</span>
+                      <strong className="text-gray-900">
+                        {formatDate(bookingData.schedule?.departureDate, t('common.locale'))} | {bookingData.schedule?.departureTime}
+                      </strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Nomor Kursi:</span>
+                      <strong className="text-blue-700 font-bold">{(bookingData.seatNumbers || []).join(', ')}</strong>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 block">Total Tagihan:</span>
+                      <strong className="text-emerald-700 font-extrabold text-sm">{formatCurrency(bookingData.totalPrice)}</strong>
+                    </div>
                   </div>
-                  <div>
-                    <span className="text-gray-500 block">Waktu Berangkat:</span>
-                    <strong className="text-gray-900">
-                      {formatDate(bookingData.schedule?.departureDate, t('common.locale'))} | {bookingData.schedule?.departureTime}
-                    </strong>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block">Nomor Kursi:</span>
-                    <strong className="text-blue-700 font-bold">{(bookingData.seatNumbers || []).join(', ')}</strong>
-                  </div>
-                  <div>
-                    <span className="text-gray-500 block">Total Tagihan:</span>
-                    <strong className="text-emerald-700 font-extrabold text-sm">{formatCurrency(bookingData.totalPrice)}</strong>
-                  </div>
-                </div>
+                )}
               </div>
 
               {/* QRIS Payment Instruction Card */}

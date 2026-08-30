@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
+import { RefreshCw, Clock, CheckCircle, AlertTriangle, Download, Calendar } from 'lucide-react';
 import api, { authService, qrisService, getImageUrl } from '../services/api';
 import Pagination from '../components/Pagination';
+import { exportToExcel } from '../utils/excelExport';
 
 // Helper function to get seat numbers for a specific row
 const getRowSeats = (rowIndex, rowsConfig) => {
@@ -19,6 +21,8 @@ function BookingTiket() {
   const [availableSeats, setAvailableSeats] = useState([]);
   const [loading, setLoading] = useState(true);
   const [qrisData, setQrisData] = useState(null);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
   useEffect(() => {
     const fetchQris = async () => {
@@ -119,6 +123,8 @@ function BookingTiket() {
       setLoading(true);
       const params = {};
       if (filterStatus) params.status = filterStatus;
+      if (startDate) params.startDate = startDate;
+      if (endDate) params.endDate = endDate;
       
       const response = await api.get('/bookings', { params });
       setBookings(response.data.data);
@@ -128,6 +134,25 @@ function BookingTiket() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportExcel = () => {
+    const dataToExport = bookings.map((b) => ({
+      'Kode Booking': b.bookingCode,
+      'Nama Penumpang': b.passengerName || b.user?.name || '',
+      'No. HP': b.passengerPhone || b.user?.phone || '',
+      'NIK': b.passengerNik || '',
+      'Email': b.passengerEmail || b.user?.email || '',
+      'Rute': `${b.schedule?.route?.originCity?.name || ''} -> ${b.schedule?.route?.destinationCity?.name || ''}`,
+      'Tanggal Keberangkatan': b.schedule?.departureDate ? new Date(b.schedule.departureDate).toLocaleDateString('id-ID') : '',
+      'Jam Keberangkatan': b.schedule?.departureTime || '',
+      'No. Kursi': b.seatNumbers?.join(', ') || '',
+      'Total Harga (Rp)': b.totalPrice || 0,
+      'Status': getStatusLabel(b.status),
+      'Metode Pembayaran': b.paymentMethod || '',
+      'Waktu Pemesanan': new Date(b.createdAt).toLocaleString('id-ID')
+    }));
+    exportToExcel(dataToExport, 'Laporan_Booking_Tiket', 'Booking Tiket');
   };
 
   const fetchSchedules = async () => {
@@ -330,11 +355,29 @@ function BookingTiket() {
           <h1 className="text-2xl font-bold text-gray-800">{t('booking.title')}</h1>
           <p className="text-gray-600 mt-1">{t('booking.subtitle')}</p>
         </div>
-        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          {/* Date range filter */}
+          <div className="flex items-center gap-1.5 bg-white border border-gray-300 rounded-lg px-3 py-1.5 text-xs shadow-xs">
+            <Calendar className="w-4 h-4 text-gray-400 shrink-0" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-transparent outline-none text-xs text-gray-800 font-semibold"
+            />
+            <span className="text-gray-400">s/d</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-transparent outline-none text-xs text-gray-800 font-semibold"
+            />
+          </div>
+
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none text-xs font-semibold"
           >
             <option value="">{t('booking.allStatus')}</option>
             <option value="PENDING">{t('booking.status.PENDING')}</option>
@@ -342,11 +385,30 @@ function BookingTiket() {
             <option value="CONFIRMED">{t('booking.status.CONFIRMED')}</option>
             <option value="CANCELLED">{t('booking.status.CANCELLED')}</option>
           </select>
+
+          <button
+            onClick={handleExportExcel}
+            className="bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 rounded-lg transition flex items-center justify-center gap-1.5 text-xs font-bold shadow-xs"
+            title="Export ke file Excel"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Excel</span>
+          </button>
+
+          <button
+            onClick={() => fetchBookings()}
+            className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3.5 py-2 rounded-lg transition flex items-center justify-center gap-1.5 text-xs font-bold border border-slate-300 shadow-xs"
+            title="Refresh Data & Auto-Cancel Overdue Pending"
+          >
+            <RefreshCw className="w-4 h-4 text-travel-blue" />
+            <span>Refresh</span>
+          </button>
+
           <button
             onClick={handleOpenBookingModal}
-            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center"
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition flex items-center justify-center font-bold text-xs shadow-xs"
           >
-            <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             {t('booking.newBooking')}
@@ -464,6 +526,11 @@ function BookingTiket() {
                         <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${getStatusBadge(booking.status)}`}>
                           {getStatusLabel(booking.status)}
                         </span>
+                        {booking.status === 'PENDING' && (
+                          <div className="text-[10px] text-amber-700 font-bold mt-1 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                            ⏰ Max Bayar: {booking.paymentDeadline ? new Date(booking.paymentDeadline).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : new Date(new Date(booking.createdAt).getTime() + 60*60*1000).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })} WIB
+                          </div>
+                        )}
                         {booking.paymentMethod && (
                           <div className="text-xs text-gray-500 mt-1">{booking.paymentMethod}</div>
                         )}

@@ -56,6 +56,8 @@ model User {
   // Relations
   bookings  Booking[]
   driver    Driver?
+  charters  Charter[]
+  packages  PackageBooking[]
 
   @@map("users")
 }
@@ -68,8 +70,10 @@ model City {
   updatedAt   DateTime @updatedAt
 
   // Relations
-  routesFrom  Route[] @relation("RouteOrigin")
-  routesTo    Route[] @relation("RouteDestination")
+  routesFrom        Route[]   @relation("RouteOrigin")
+  routesTo          Route[]   @relation("RouteDestination")
+  chartersFrom      Charter[] @relation("CharterOrigin")
+  chartersTo        Charter[] @relation("CharterDestination")
 
   @@map("cities")
 }
@@ -118,13 +122,19 @@ model Vehicle {
   description    String?
   facilities     Json?
   imageUrl       String?
-  status         VehicleStatus @default(ACTIVE)
+  maxCharter       Int           @default(0)
+  charterPrice     Int           @default(0)
+  maxPackageCount  Int           @default(0)
+  maxPackageWeight Int           @default(0)
+  packagePricePerKg Int          @default(0)
+  status           VehicleStatus @default(ACTIVE)
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
   // Relations
   seatTemplate   SeatTemplate?  @relation(fields: [seatTemplateId], references: [id])
   schedules      Schedule[]
+  charters       Charter[]
 
   @@map("vehicles")
 }
@@ -179,6 +189,7 @@ model Schedule {
   vehicle         Vehicle        @relation(fields: [vehicleId], references: [id])
   driver          Driver         @relation(fields: [driverId], references: [id])
   bookings        Booking[]
+  packages        PackageBooking[]
   sourceTemplate  Schedule?      @relation("TemplateSchedules", fields: [sourceTemplateId], references: [id], onDelete: SetNull)
   generatedSchedules Schedule[]  @relation("TemplateSchedules")
 
@@ -196,6 +207,7 @@ model Booking {
   status            BookingStatus @default(PENDING)
   paymentMethod     String?
   paidAt            DateTime?
+  paymentDeadline   DateTime?
   passengerName     String?       // Nama Customer / Penumpang
   passengerPhone    String?       // No WhatsApp / HP
   passengerEmail    String?       // Email Penumpang
@@ -259,5 +271,106 @@ model SocialSetting {
 
   @@map("social_settings")
 }
+
+enum CharterStatus {
+  PENDING
+  PAID
+  PROCESSED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model Charter {
+  id                 String        @id @default(uuid())
+  charterCode        String        @unique
+  userId             String?
+  vehicleId          String
+  originCityId       String?
+  destinationCityId  String?
+  originAddress      String
+  destinationAddress String
+  charterDate        DateTime
+  durationDays       Int           @default(1)
+  totalVehicles      Int           @default(1)
+  totalPrice         Int
+  status             CharterStatus @default(PENDING)
+
+  customerName       String
+  customerPhone      String
+  customerEmail      String?
+  notes              String?
+
+  paymentMethod      String?
+  paidAt             DateTime?
+  paymentDeadline    DateTime?
+  paymentProofUrl    String?
+  paymentSenderName  String?
+  paymentBankName    String?
+  paymentTargetBank  String?
+  paymentAmount      Int?
+  paymentNotes       String?
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  user               User?         @relation(fields: [userId], references: [id])
+  vehicle            Vehicle       @relation(fields: [vehicleId], references: [id])
+  originCity         City?         @relation("CharterOrigin", fields: [originCityId], references: [id])
+  destinationCity    City?         @relation("CharterDestination", fields: [destinationCityId], references: [id])
+
+  @@map("charters")
+}
+
+enum PackageStatus {
+  PENDING
+  PAID
+  PROCESSED
+  CONFIRMED
+  CANCELLED
+  COMPLETED
+}
+
+model PackageBooking {
+  id                 String        @id @default(uuid())
+  packageCode        String        @unique
+  scheduleId         String
+  userId             String?
+
+  senderName         String
+  senderPhone        String
+  senderAddress      String?
+
+  recipientName      String
+  recipientPhone     String
+  recipientAddress   String
+
+  packageDescription String
+  itemCount          Int           @default(1)
+  weightKg           Int           @default(1)
+  totalPrice         Int
+  status             PackageStatus @default(PENDING)
+
+  paymentMethod      String?
+  paidAt             DateTime?
+  paymentDeadline    DateTime?
+  paymentProofUrl    String?
+  paymentSenderName  String?
+  paymentBankName    String?
+  paymentTargetBank  String?
+  paymentAmount      Int?
+  paymentNotes       String?
+
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  // Relations
+  user               User?         @relation(fields: [userId], references: [id])
+  schedule           Schedule      @relation(fields: [scheduleId], references: [id])
+
+  @@map("package_bookings")
+}
+
 
 

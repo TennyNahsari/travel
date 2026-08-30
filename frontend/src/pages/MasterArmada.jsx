@@ -18,7 +18,9 @@ function MasterArmada() {
     status: 'ACTIVE',
     description: '',
     facilities: '[\n  "Reclining Seats",\n  "Full AC Premium",\n  "USB Fast Charger",\n  "WiFi Gratis",\n  "Bagasi Luas"\n]',
-    imageUrl: ''
+    imageUrl: '',
+    maxCharter: 0,
+    charterPrice: 0
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -73,7 +75,9 @@ function MasterArmada() {
         seatTemplateId: vehicle.seatTemplateId || vehicle.seatTemplate?.id || '',
         description: vehicle.description || '',
         facilities: facilitiesStr,
-        imageUrl: vehicle.imageUrl || ''
+        imageUrl: vehicle.imageUrl || '',
+        maxCharter: vehicle.maxCharter !== undefined ? vehicle.maxCharter : 0,
+        charterPrice: vehicle.charterPrice !== undefined ? vehicle.charterPrice : 0
       });
     } else {
       setEditMode(false);
@@ -85,7 +89,12 @@ function MasterArmada() {
         status: 'ACTIVE',
         description: '',
         facilities: '[\n  "Reclining Seats",\n  "Full AC Premium",\n  "USB Fast Charger",\n  "WiFi Gratis",\n  "Bagasi Luas"\n]',
-        imageUrl: ''
+        imageUrl: '',
+        maxCharter: 0,
+        charterPrice: 0,
+        maxPackageCount: 0,
+        maxPackageWeight: 0,
+        packagePricePerKg: 0
       });
     }
     setShowModal(true);
@@ -103,7 +112,12 @@ function MasterArmada() {
       status: 'ACTIVE',
       description: '',
       facilities: '',
-      imageUrl: ''
+      imageUrl: '',
+      maxCharter: 0,
+      charterPrice: 0,
+      maxPackageCount: 0,
+      maxPackageWeight: 0,
+      packagePricePerKg: 0
     });
     setError('');
   };
@@ -292,6 +306,17 @@ function MasterArmada() {
                           {vehicle.seatTemplate && (
                             <div className="text-xs text-gray-500">{vehicle.seatTemplate.name}</div>
                           )}
+                          <div className="mt-1">
+                            {vehicle.maxCharter > 0 ? (
+                              <span className="inline-block text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                                🚗 Charter: Max {vehicle.maxCharter}/hari (Rp {Number(vehicle.charterPrice || 0).toLocaleString('id-ID')})
+                              </span>
+                            ) : (
+                              <span className="inline-block text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                                Non-Charter
+                              </span>
+                            )}
+                          </div>
                         </div>
                       </td>
                       <td className="px-6 py-4">
@@ -350,6 +375,17 @@ function MasterArmada() {
                         </div>
                         <p className="text-sm font-bold text-gray-800">{vehicle.plateNumber}</p>
                         <p className="text-xs text-blue-600 font-semibold">{vehicle.vehicleType} ({vehicle.capacity} {t('schedule.seats', 'Kursi')})</p>
+                        <div className="mt-1">
+                          {vehicle.maxCharter > 0 ? (
+                            <span className="inline-block text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5 rounded-full">
+                              🚗 Charter: Max {vehicle.maxCharter}/hari (Rp {Number(vehicle.charterPrice || 0).toLocaleString('id-ID')})
+                            </span>
+                          ) : (
+                            <span className="inline-block text-[10px] font-medium bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
+                              Non-Charter
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
@@ -514,6 +550,89 @@ function MasterArmada() {
                       <span className="text-xs text-gray-500 font-medium">Preview Foto Armada</span>
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('masterVehicle.maxCharter', 'Batas Charter Harian (Unit)')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={currentVehicle.maxCharter}
+                    onChange={(e) => setCurrentVehicle({ ...currentVehicle, maxCharter: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800"
+                    placeholder="Contoh: 3 (Maksimal 3 mobil yang bisa dicarter per hari)"
+                  />
+                  <p className="text-[11px] text-gray-500 mt-1">
+                    💡 Jika diisi misal 3, maka untuk armada ini pada hari tertentu maksimal 3 unit yang bisa dicarter. Isikan 0 jika tidak melayani charter.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    {t('masterVehicle.charterPrice', 'Harga Charter per Hari (Rp)')}
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={currentVehicle.charterPrice}
+                    onChange={(e) => setCurrentVehicle({ ...currentVehicle, charterPrice: parseInt(e.target.value, 10) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none font-bold text-gray-800"
+                    placeholder="Contoh: 1500000"
+                  />
+                </div>
+
+                {/* Package Delivery Configuration */}
+                <div className="pt-3 border-t border-gray-200 space-y-4">
+                  <h4 className="text-xs font-extrabold uppercase text-blue-900 tracking-wider">📦 Konfigurasi Pengiriman Paket / Kargo</h4>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Batas Maksimal Jumlah Paket (Unit / Jadwal)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={currentVehicle.maxPackageCount || 0}
+                        onChange={(e) => setCurrentVehicle({ ...currentVehicle, maxPackageCount: parseInt(e.target.value, 10) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 outline-none"
+                        placeholder="Contoh: 5"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-gray-700 mb-1">
+                        Batas Maksimal Berat Paket (Kg / Jadwal)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={currentVehicle.maxPackageWeight || 0}
+                        onChange={(e) => setCurrentVehicle({ ...currentVehicle, maxPackageWeight: parseInt(e.target.value, 10) || 0 })}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 outline-none"
+                        placeholder="Contoh: 50"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Tarif Pengiriman Paket per Kg (Rp)
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={currentVehicle.packagePricePerKg || 0}
+                      onChange={(e) => setCurrentVehicle({ ...currentVehicle, packagePricePerKg: parseInt(e.target.value, 10) || 0 })}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-xs font-bold text-gray-800 outline-none"
+                      placeholder="Contoh: 10000"
+                    />
+                    <p className="text-[11px] text-gray-500 mt-1">
+                      💡 Apabila salah satu batas (jumlah unit atau berat Kg) terpenuhi pada jadwal keberangkatan tertentu, sistem akan memblokir pengiriman paket berikutnya untuk jadwal tersebut.
+                    </p>
+                  </div>
                 </div>
 
                 <div>
