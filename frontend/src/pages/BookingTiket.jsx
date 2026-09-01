@@ -1,10 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
-import { RefreshCw, Clock, CheckCircle, AlertTriangle, Download, Calendar } from 'lucide-react';
+import { RefreshCw, Clock, CheckCircle, AlertTriangle, Download, Calendar, MessageCircle } from 'lucide-react';
 import api, { authService, qrisService, getImageUrl } from '../services/api';
 import Pagination from '../components/Pagination';
 import { exportToExcel } from '../utils/excelExport';
+
+const getContactWaLink = (phone, bookingCode, name) => {
+  if (!phone) return '#';
+  let clean = phone.replace(/\D/g, '');
+  if (clean.startsWith('0')) {
+    clean = '62' + clean.slice(1);
+  }
+  const msg = `Halo ${name || 'Pelanggan'}, mengenai Booking Tiket ${bookingCode || ''}...`;
+  return `https://wa.me/${clean}?text=${encodeURIComponent(msg)}`;
+};
 
 // Helper function to get seat numbers for a specific row
 const getRowSeats = (rowIndex, rowsConfig) => {
@@ -486,9 +496,25 @@ function BookingTiket() {
                           <div className="text-sm font-bold text-gray-800">
                             {booking.passengerName || booking.user?.name || 'N/A'}
                           </div>
-                          {booking.passengerPhone && (
-                            <div className="text-xs text-gray-600">
-                              📱 {booking.passengerPhone}
+                          {(booking.passengerPhone || booking.user?.phone) && (
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-xs text-gray-600">
+                                📱 {booking.passengerPhone || booking.user?.phone}
+                              </span>
+                              <a
+                                href={getContactWaLink(
+                                  booking.passengerPhone || booking.user?.phone,
+                                  booking.bookingCode,
+                                  booking.passengerName || booking.user?.name
+                                )}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200"
+                                title="Chat WhatsApp Penumpang"
+                              >
+                                <MessageCircle className="w-3 h-3 text-emerald-600" />
+                                <span>WA</span>
+                              </a>
                             </div>
                           )}
                           {booking.passengerNik && (
@@ -650,7 +676,25 @@ function BookingTiket() {
                       <div className="col-span-2 bg-slate-50 p-2 rounded-lg">
                         <span className="text-gray-500 font-bold">Penumpang:</span>
                         <p className="font-bold text-gray-800 text-sm">{booking.passengerName || booking.user?.name || 'N/A'}</p>
-                        {booking.passengerPhone && <p className="text-gray-600">📱 WA: {booking.passengerPhone}</p>}
+                        {(booking.passengerPhone || booking.user?.phone) && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="text-gray-600">📱 WA: {booking.passengerPhone || booking.user?.phone}</span>
+                            <a
+                              href={getContactWaLink(
+                                booking.passengerPhone || booking.user?.phone,
+                                booking.bookingCode,
+                                booking.passengerName || booking.user?.name
+                              )}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200"
+                              title="Chat WhatsApp Penumpang"
+                            >
+                              <MessageCircle className="w-3 h-3 text-emerald-600" />
+                              <span>WA</span>
+                            </a>
+                          </div>
+                        )}
                         {booking.passengerNik && <p className="text-blue-600 font-mono font-semibold">🪪 NIK: {booking.passengerNik}</p>}
                       </div>
                       <div>

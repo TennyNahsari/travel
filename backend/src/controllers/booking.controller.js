@@ -11,7 +11,7 @@ const generateBookingCode = () => {
 // Get all bookings
 const getBookings = async (req, res) => {
   try {
-    const { status, search, userId } = req.query;
+    const { status, search, userId, startDate, endDate } = req.query;
     
     // Auto-cancel overdue PENDING bookings
     const now = new Date();

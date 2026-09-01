@@ -347,7 +347,22 @@ const PengirimanPaket = () => {
                         </div>
                       </td>
                       <td className="px-6 py-4 max-w-xs">
-                        <span className="font-bold text-deep-navy block">{pkg.recipientName} ({pkg.recipientPhone})</span>
+                        <span className="font-extrabold text-deep-navy block">{pkg.recipientName}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className="text-[11px] text-slate-500">{pkg.recipientPhone}</span>
+                          {pkg.recipientPhone && (
+                            <a
+                              href={getWaContactLink(pkg.recipientPhone, pkg.packageCode, pkg.recipientName, 'Penerima')}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200"
+                              title="Chat WhatsApp Penerima"
+                            >
+                              <MessageCircle className="w-3 h-3 text-emerald-600" />
+                              <span>WA</span>
+                            </a>
+                          )}
+                        </div>
                         <p className="text-[10px] text-slate-500 truncate mt-0.5">📍 {pkg.recipientAddress}</p>
                       </td>
                       <td className="px-6 py-4 max-w-xs">
@@ -443,13 +458,37 @@ const PengirimanPaket = () => {
                     </select>
                   </div>
 
-                  <div className="p-2.5 bg-soft-sky/60 rounded-xl text-xs space-y-1">
-                    <p className="text-[11px] text-slate-700 font-semibold">
-                      👤 Pengirim: <strong>{pkg.senderName}</strong> ({pkg.senderPhone})
-                    </p>
-                    <p className="text-[11px] text-slate-700 font-semibold">
-                      🏠 Penerima: <strong>{pkg.recipientName}</strong> ({pkg.recipientPhone})
-                    </p>
+                  <div className="p-2.5 bg-soft-sky/60 rounded-xl text-xs space-y-1.5">
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-700 font-semibold">
+                      <span>👤 Pengirim: <strong>{pkg.senderName}</strong> ({pkg.senderPhone})</span>
+                      {pkg.senderPhone && (
+                        <a
+                          href={getWaContactLink(pkg.senderPhone, pkg.packageCode, pkg.senderName, 'Pengirim')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200"
+                          title="Chat WhatsApp Pengirim"
+                        >
+                          <MessageCircle className="w-3 h-3 text-emerald-600" />
+                          <span>WA</span>
+                        </a>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-slate-700 font-semibold">
+                      <span>🏠 Penerima: <strong>{pkg.recipientName}</strong> ({pkg.recipientPhone})</span>
+                      {pkg.recipientPhone && (
+                        <a
+                          href={getWaContactLink(pkg.recipientPhone, pkg.packageCode, pkg.recipientName, 'Penerima')}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-emerald-50 text-emerald-700 text-[10px] font-bold rounded-md border border-emerald-200"
+                          title="Chat WhatsApp Penerima"
+                        >
+                          <MessageCircle className="w-3 h-3 text-emerald-600" />
+                          <span>WA</span>
+                        </a>
+                      )}
+                    </div>
                     <p className="text-[11px] text-slate-500">📍 {pkg.recipientAddress}</p>
                   </div>
 
