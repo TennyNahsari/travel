@@ -2,7 +2,7 @@
 -- INIT.SQL FOR TRAVEL SHUTTLE DATABASE (POSTGRESQL)
 -- KETERANGAN LOGIN ADMIN:
 -- Email    : admin@travel.com
--- Password : password123
+-- Password : password123 
 -- =========================================================
 
 -- Enable pgcrypto extension for UUID generation (if needed)
