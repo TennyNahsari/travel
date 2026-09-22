@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { ensureSchedulesForDateRange } = require('../utils/scheduleAutoGenerator');
 const prisma = new PrismaClient();
 
 // Get all schedules with relations
@@ -6,7 +7,20 @@ const getSchedules = async (req, res) => {
   try {
     const { date, routeId, status } = req.query;
     
-    const where = {};
+    // Auto-generate schedules for requested date or upcoming 14 days
+    if (date) {
+      const searchDate = new Date(date);
+      await ensureSchedulesForDateRange(searchDate, searchDate);
+    } else {
+      const today = new Date();
+      const fourteenDaysLater = new Date(today);
+      fourteenDaysLater.setDate(today.getDate() + 14);
+      await ensureSchedulesForDateRange(today, fourteenDaysLater);
+    }
+
+    const where = {
+      isTemplate: false
+    };
     
     // Filter by date if provided
     if (date) {
@@ -25,8 +39,10 @@ const getSchedules = async (req, res) => {
       where.routeId = routeId;
     }
     
-    // Filter by available seats (active schedules)
-    if (status === 'active') {
+    // Filter by status if provided (e.g. status=SCHEDULED)
+    if (status && status !== 'all' && status !== 'active' && status !== 'UPCOMING') {
+      where.status = status;
+    } else if (status === 'active') {
       where.availableSeats = {
         gt: 0
       };

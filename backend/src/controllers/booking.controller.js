@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { ensureSchedulesForDateRange } = require('../utils/scheduleAutoGenerator');
 const prisma = new PrismaClient();
 
 // Generate booking code
@@ -590,7 +591,23 @@ const getAvailableSchedules = async (req, res) => {
   try {
     const { date, routeId } = req.query;
     
+    // Auto-generate schedules for requested date or upcoming 14 days before querying
+    if (date) {
+      const searchDate = new Date(date);
+      await ensureSchedulesForDateRange(searchDate, searchDate);
+    } else {
+      const today = new Date();
+      const fourteenDaysLater = new Date(today);
+      fourteenDaysLater.setDate(today.getDate() + 14);
+      await ensureSchedulesForDateRange(today, fourteenDaysLater);
+    }
+
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
+
     const where = {
+      isTemplate: false,
+      status: 'SCHEDULED',
       availableSeats: {
         gt: 0
       }
@@ -598,17 +615,16 @@ const getAvailableSchedules = async (req, res) => {
     
     if (date) {
       const searchDate = new Date(date);
-      const nextDay = new Date(searchDate);
+      const effectiveStartDate = searchDate < startOfToday ? startOfToday : searchDate;
+      const nextDay = new Date(effectiveStartDate);
       nextDay.setDate(nextDay.getDate() + 1);
       
       where.departureDate = {
-        gte: searchDate,
+        gte: effectiveStartDate,
         lt: nextDay
       };
     } else {
       // Show today's and future schedules
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
       where.departureDate = {
         gte: startOfToday
       };

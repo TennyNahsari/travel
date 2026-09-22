@@ -302,21 +302,54 @@ const DestinationDiscovery = ({ searchQuery = '', onOpenBookingModal, onOpenPack
                     <span>Sebelumnya</span>
                   </button>
 
-                  {/* Page Numbers */}
+                  {/* Page Numbers (Awal, Ellipsis, Akhir) */}
                   <div className="flex items-center gap-1.5">
-                    {Array.from({ length: totalPages }, (_, i) => i + 1).map((pageNum) => (
-                      <button
-                        key={pageNum}
-                        onClick={() => setCurrentPage(pageNum)}
-                        className={`w-8 h-8 rounded-lg text-xs font-extrabold transition-all ${
-                          currentPage === pageNum
-                            ? 'bg-travel-blue text-white shadow-sm'
-                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                        }`}
-                      >
-                        {pageNum}
-                      </button>
-                    ))}
+                    {(() => {
+                      const pages = [];
+                      const maxVisible = 5;
+                      if (totalPages <= maxVisible) {
+                        for (let i = 1; i <= totalPages; i++) pages.push(i);
+                      } else {
+                        if (currentPage <= 3) {
+                          for (let i = 1; i <= 4; i++) pages.push(i);
+                          pages.push('...');
+                          pages.push(totalPages);
+                        } else if (currentPage >= totalPages - 2) {
+                          pages.push(1);
+                          pages.push('...');
+                          for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+                        } else {
+                          pages.push(1);
+                          pages.push('...');
+                          for (let i = currentPage - 1; i <= currentPage + 1; i++) pages.push(i);
+                          pages.push('...');
+                          pages.push(totalPages);
+                        }
+                      }
+
+                      return pages.map((pageNum, idx) => {
+                        if (pageNum === '...') {
+                          return (
+                            <span key={`ellipsis-${idx}`} className="px-1 text-xs font-bold text-slate-400 select-none">
+                              ...
+                            </span>
+                          );
+                        }
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-8 h-8 rounded-lg text-xs font-extrabold transition-all ${
+                              currentPage === pageNum
+                                ? 'bg-travel-blue text-white shadow-sm'
+                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                            }`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      });
+                    })()}
                   </div>
 
                   {/* Next Button (Pagination ke kanan) */}

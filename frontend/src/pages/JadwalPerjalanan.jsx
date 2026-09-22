@@ -17,8 +17,6 @@ function JadwalPerjalanan() {
   const [drivers, setDrivers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [showSyncModal, setShowSyncModal] = useState(false);
-  const [syncing, setSyncing] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [currentSchedule, setCurrentSchedule] = useState({
     id: '',
@@ -34,6 +32,7 @@ function JadwalPerjalanan() {
     templateName: ''
   });
   const [filterDate, setFilterDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('UPCOMING'); // 'UPCOMING', 'SCHEDULED', 'DEPARTED', 'COMPLETED', 'CANCELLED', 'ALL'
   const [sortOrder, setSortOrder] = useState('asc'); // 'asc' or 'desc'
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -67,11 +66,11 @@ function JadwalPerjalanan() {
   const handleUpdateScheduleStatus = async (scheduleId, newStatus) => {
     try {
       await api.put(`/schedules/${scheduleId}/status`, { status: newStatus });
-      setSuccess('Status jadwal berhasil diperbarui');
+      setSuccess(t('schedule.statusUpdateSuccess'));
       fetchSchedules();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Gagal mengubah status jadwal');
+      setError(err.response?.data?.error || t('schedule.statusUpdateError'));
       setTimeout(() => setError(''), 4000);
     }
   };
@@ -81,50 +80,63 @@ function JadwalPerjalanan() {
       case 'DEPARTED':
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-200">
-            {t('schedule.statusDeparted', '🚌 Berangkat')}
+            {t('schedule.statusDeparted')}
           </span>
         );
       case 'COMPLETED':
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-200">
-            {t('schedule.statusCompleted', '🏁 Selesai')}
+            {t('schedule.statusCompleted')}
           </span>
         );
       case 'CANCELLED':
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-200">
-            {t('schedule.statusCancelled', '❌ Dibatalkan')}
+            {t('schedule.statusCancelled')}
           </span>
         );
       case 'SCHEDULED':
       default:
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 border border-blue-200">
-            {t('schedule.statusScheduled', '📅 Terjadwal')}
+            {t('schedule.statusScheduled')}
           </span>
         );
     }
   };
 
-  // Memoized sorted schedules
+  // Memoized sorted and filtered schedules
   const sortedSchedules = useMemo(() => {
     if (schedules.length === 0) return [];
     
-    console.log('Sample schedule:', schedules[0]);
-    console.log('departureDate type:', typeof schedules[0]?.departureDate);
-    console.log('departureDate value:', schedules[0]?.departureDate);
-    
-    const sorted = [...schedules].sort((a, b) => {
-      // Parse date string properly
-      // departureDate from API is in ISO format: "2026-03-10T00:00:00.000Z"
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const filtered = schedules.filter(s => {
+      const scheduleDate = new Date(s.departureDate);
+      scheduleDate.setHours(0, 0, 0, 0);
+      const isPast = scheduleDate < today;
+
+      if (statusFilter === 'UPCOMING') {
+        // Hide past completed or cancelled schedules by default
+        if (isPast && (s.status === 'COMPLETED' || s.status === 'CANCELLED')) {
+          return false;
+        }
+        return true;
+      } else if (statusFilter === 'ALL') {
+        return true;
+      } else {
+        return s.status === statusFilter;
+      }
+    });
+
+    return [...filtered].sort((a, b) => {
       const dateA = new Date(a.departureDate);
       const dateB = new Date(b.departureDate);
       
-      // Parse time (format: "HH:MM")
-      const [hoursA, minutesA] = a.departureTime.split(':').map(Number);
-      const [hoursB, minutesB] = b.departureTime.split(':').map(Number);
+      const [hoursA, minutesA] = (a.departureTime || '00:00').split(':').map(Number);
+      const [hoursB, minutesB] = (b.departureTime || '00:00').split(':').map(Number);
       
-      // Set the time on the date objects
       dateA.setHours(hoursA, minutesA, 0, 0);
       dateB.setHours(hoursB, minutesB, 0, 0);
       
@@ -134,14 +146,7 @@ function JadwalPerjalanan() {
         return dateB - dateA;
       }
     });
-    
-    console.log('Sorted (first 3):', sorted.slice(0, 3).map(s => ({ 
-      date: s.departureDate, 
-      time: s.departureTime,
-      route: s.route?.originCity?.name + ' → ' + s.route?.destinationCity?.name
-    })));
-    return sorted;
-  }, [schedules, sortOrder]);
+  }, [schedules, statusFilter, sortOrder]);
 
   // Count past schedules
   const pastSchedulesCount = useMemo(() => {
@@ -161,43 +166,10 @@ function JadwalPerjalanan() {
       const response = await api.get('/schedule-templates');
       setTemplates(response.data.data);
     } catch (err) {
-      setError('Gagal memuat template jadwal');
+      setError(t('schedule.templateLoadError'));
       console.error(err);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const handleSyncSchedules = async (days) => {
-    try {
-      setSyncing(true);
-      setError('');
-      setSuccess('');
-      const response = await api.post('/schedule-templates/generate', { days });
-      const result = response.data.data;
-      
-      let message = `Berhasil membuat ${result.created} jadwal baru untuk ${result.period}.`;
-      if (result.skipped > 0) {
-        const reasons = [];
-        if (result.skipReasons?.duplicate > 0) reasons.push(`${result.skipReasons.duplicate} duplikat`);
-        if (result.skipReasons?.vehicleConflict > 0) reasons.push(`${result.skipReasons.vehicleConflict} konflik kendaraan`);
-        if (result.skipReasons?.driverConflict > 0) reasons.push(`${result.skipReasons.driverConflict} konflik driver`);
-        message += ` ${result.skipped} jadwal diskip${reasons.length > 0 ? ` (${reasons.join(', ')})` : ''}.`;
-      }
-      
-      setSuccess(message);
-      setShowSyncModal(false);
-      
-      // Refresh schedules
-      if (activeTab === 'schedules') {
-        fetchSchedules();
-      }
-      
-      setTimeout(() => setSuccess(''), 5000);
-    } catch (err) {
-      setError(err.response?.data?.error || 'Gagal melakukan sinkronisasi');
-    } finally {
-      setSyncing(false);
     }
   };
 
@@ -213,12 +185,12 @@ function JadwalPerjalanan() {
     });
     
     if (pastSchedules.length === 0) {
-      setError('Tidak ada jadwal yang sudah lewat');
+      setError(t('schedule.noPastSchedules'));
       setTimeout(() => setError(''), 3000);
       return;
     }
     
-    const confirmMessage = `Hapus ${pastSchedules.length} jadwal yang sudah lewat (hari kemarin dan sebelumnya)?`;
+    const confirmMessage = t('schedule.deletePastConfirm', { count: pastSchedules.length });
     if (!window.confirm(confirmMessage)) {
       return;
     }
@@ -238,11 +210,11 @@ function JadwalPerjalanan() {
         }
       }
       
-      setSuccess(`${deletedCount} jadwal yang sudah lewat berhasil dihapus`);
+      setSuccess(t('schedule.deletePastSuccess', { count: deletedCount }));
       fetchSchedules();
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError(err.response?.data?.error || 'Gagal menghapus jadwal');
+      setError(err.response?.data?.error || t('schedule.deletePastError'));
       setTimeout(() => setError(''), 3000);
     } finally {
       setLoading(false);
@@ -362,10 +334,10 @@ function JadwalPerjalanan() {
 
         if (editMode) {
           await api.put(`/schedule-templates/${currentSchedule.id}`, payload);
-          setSuccess('Template berhasil diperbarui');
+          setSuccess(t('schedule.templateUpdateSuccess'));
         } else {
           await api.post('/schedule-templates', payload);
-          setSuccess('Template berhasil ditambahkan');
+          setSuccess(t('schedule.templateAddSuccess'));
         }
         fetchTemplates();
       } else {
@@ -406,14 +378,14 @@ function JadwalPerjalanan() {
   };
 
   const handleDeleteTemplate = async (id, name) => {
-    if (window.confirm(`Hapus template "${name}"?`)) {
+    if (window.confirm(t('schedule.deleteTemplateConfirm', { name }))) {
       try {
         await api.delete(`/schedule-templates/${id}`);
-        setSuccess('Template berhasil dihapus');
+        setSuccess(t('schedule.deleteTemplateSuccess'));
         fetchTemplates();
         setTimeout(() => setSuccess(''), 3000);
       } catch (err) {
-        setError(err.response?.data?.error || 'Gagal menghapus template');
+        setError(err.response?.data?.error || t('schedule.deleteTemplateError'));
         setTimeout(() => setError(''), 3000);
       }
     }
@@ -490,12 +462,24 @@ function JadwalPerjalanan() {
                   className="flex-1 min-w-[140px] px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                 />
                 <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white font-medium text-gray-700"
+                >
+                  <option value="UPCOMING">{t('schedule.filterUpcoming')}</option>
+                  <option value="SCHEDULED">{t('schedule.filterScheduled')}</option>
+                  <option value="DEPARTED">{t('schedule.filterDeparted')}</option>
+                  <option value="COMPLETED">{t('schedule.filterCompleted')}</option>
+                  <option value="CANCELLED">{t('schedule.filterCancelled')}</option>
+                  <option value="ALL">{t('schedule.filterAll')}</option>
+                </select>
+                <select
                   value={sortOrder}
                   onChange={(e) => setSortOrder(e.target.value)}
                   className="px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none bg-white"
                 >
-                  <option value="asc">↑ {t('schedule.oldest', 'Terlama')}</option>
-                  <option value="desc">↓ {t('schedule.newest', 'Terbaru')}</option>
+                  <option value="asc">↑ {t('schedule.oldest')}</option>
+                  <option value="desc">↓ {t('schedule.newest')}</option>
                 </select>
               </>
             )}
@@ -507,7 +491,7 @@ function JadwalPerjalanan() {
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                 </svg>
-                {activeTab === 'schedules' ? t('schedule.addSchedule') : t('schedule.addTemplate', 'Tambah Template')}
+                {activeTab === 'schedules' ? t('schedule.addSchedule') : t('schedule.addTemplate')}
               </button>
             )}
           </div>
@@ -516,16 +500,6 @@ function JadwalPerjalanan() {
           {activeTab === 'schedules' && !isDriver && (
             <div className="flex flex-wrap gap-2">
               <button
-                onClick={() => setShowSyncModal(true)}
-                className="flex-1 sm:flex-initial bg-green-600 text-white px-3 sm:px-4 py-2 text-sm rounded-lg hover:bg-green-700 transition flex items-center justify-center whitespace-nowrap"
-              >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-                <span className="hidden sm:inline">{t('schedule.sync', 'Sinkronisasi')}</span>
-                <span className="sm:hidden">Sync</span>
-              </button>
-              <button
                 onClick={handleDeletePastSchedules}
                 disabled={pastSchedulesCount === 0}
                 className="flex-1 sm:flex-initial bg-red-600 text-white px-3 sm:px-4 py-2 text-sm rounded-lg hover:bg-red-700 transition flex items-center justify-center whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed relative"
@@ -533,8 +507,8 @@ function JadwalPerjalanan() {
                 <svg className="w-4 h-4 sm:w-5 sm:h-5 mr-1 sm:mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
-                <span className="hidden sm:inline">{t('schedule.deletePastSchedules', 'Hapus Jadwal Lewat')}</span>
-                <span className="sm:hidden">{t('schedule.deletePastSchedules', 'Hapus Lewat')}</span>
+                <span className="hidden sm:inline">{t('schedule.deletePastSchedules')}</span>
+                <span className="sm:hidden">{t('schedule.deletePastSchedules')}</span>
                 {pastSchedulesCount > 0 && (
                   <span className="ml-1 sm:ml-2 bg-white text-red-600 px-1.5 sm:px-2 py-0.5 rounded-full text-xs font-bold">
                     {pastSchedulesCount}
@@ -556,7 +530,7 @@ function JadwalPerjalanan() {
               : 'text-gray-500 hover:text-gray-700'
           }`}
         >
-          {t('schedule.activeSchedules', 'Jadwal Aktif')}
+          {t('schedule.activeSchedules')}
         </button>
         {!isDriver && (
           <button
@@ -567,7 +541,7 @@ function JadwalPerjalanan() {
                 : 'text-gray-500 hover:text-gray-700'
             }`}
           >
-            {t('schedule.scheduleTemplates', 'Template Jadwal')}
+            {t('schedule.scheduleTemplates')}
           </button>
         )}
       </div>
@@ -600,31 +574,31 @@ function JadwalPerjalanan() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      NO
+                      {t('schedule.number')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.routeAndPool', 'RUTE & POOL PERJALANAN')}
+                      {t('schedule.routeAndPool')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.dateTimeHeader', 'TANGGAL & WAKTU')}
+                      {t('schedule.dateTimeHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.vehicleHeader', 'ARMADA')}
+                      {t('schedule.vehicleHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.driverHeader', 'DRIVER')}
+                      {t('schedule.driverHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.priceHeader', 'HARGA')}
+                      {t('schedule.priceHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.seatsAvailableHeader', 'KURSI TERSEDIA')}
+                      {t('schedule.seatsAvailableHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('schedule.statusHeader', 'STATUS PERJALANAN')}
+                      {t('schedule.statusHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                      {t('common.actions', 'AKSI')}
+                      {t('common.actions')}
                     </th>
                   </tr>
                 </thead>
@@ -638,8 +612,8 @@ function JadwalPerjalanan() {
                   ) : (
                     sortedSchedules.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map((schedule, index) => {
                       const canDriverUpdate = isStaff || (isDriver && schedule.driver?.userId === currentUser?.id);
-                      const poolOriginText = schedule.poolOrigin || (schedule.route?.originCity?.name ? `Pool ${schedule.route.originCity.name}` : '-');
-                      const poolDestText = schedule.poolDestination || (schedule.route?.destinationCity?.name ? `Pool ${schedule.route.destinationCity.name}` : '-');
+                      const poolOriginText = schedule.poolOrigin || (schedule.route?.originCity?.name ? `${t('schedule.poolPrefix')} ${schedule.route.originCity.name}` : '-');
+                      const poolDestText = schedule.poolDestination || (schedule.route?.destinationCity?.name ? `${t('schedule.poolPrefix')} ${schedule.route.destinationCity.name}` : '-');
 
                       return (
                         <tr key={schedule.id} className="hover:bg-gray-50">
@@ -652,8 +626,8 @@ function JadwalPerjalanan() {
                               {schedule.route.originCity.province} - {schedule.route.destinationCity.province}
                             </div>
                             <div className="text-[11px] text-blue-800 bg-blue-50/90 p-2 rounded-lg border border-blue-100 space-y-0.5 mt-1 font-medium">
-                              <div>🏢 <strong>Pool Asal:</strong> {poolOriginText}</div>
-                              <div>🏁 <strong>Pool Tujuan:</strong> {poolDestText}</div>
+                              <div>🏢 <strong>{t('schedule.poolOriginLabel')}:</strong> {poolOriginText}</div>
+                              <div>🏁 <strong>{t('schedule.poolDestinationLabel')}:</strong> {poolDestText}</div>
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -661,7 +635,7 @@ function JadwalPerjalanan() {
                               {formatDate(schedule.departureDate)}
                             </div>
                             <div className="text-xs text-gray-500">
-                              {formatTime(schedule.departureTime)} WIB
+                              {formatTime(schedule.departureTime)} {t('common.timezone')}
                             </div>
                           </td>
                           <td className="px-6 py-4">
@@ -689,13 +663,13 @@ function JadwalPerjalanan() {
                                   onChange={(e) => handleUpdateScheduleStatus(schedule.id, e.target.value)}
                                   className="text-[11px] font-semibold border border-gray-300 rounded px-1.5 py-0.5 mt-1 bg-white outline-none focus:ring-1 focus:ring-blue-500"
                                 >
-                                  <option value="SCHEDULED">📅 SCHEDULED (Terjadwal)</option>
-                                  <option value="DEPARTED">🚌 DEPARTED (Berangkat)</option>
-                                  <option value="COMPLETED">🏁 COMPLETED (Selesai)</option>
-                                  <option value="CANCELLED">❌ CANCELLED (Dibatalkan)</option>
+                                  <option value="SCHEDULED">📅 SCHEDULED ({t('schedule.statusScheduledText')})</option>
+                                  <option value="DEPARTED">🚌 DEPARTED ({t('schedule.statusDepartedText')})</option>
+                                  <option value="COMPLETED">🏁 COMPLETED ({t('schedule.statusCompletedText')})</option>
+                                  <option value="CANCELLED">❌ CANCELLED ({t('schedule.statusCancelledText')})</option>
                                 </select>
                               ) : (
-                                <span className="text-[10px] text-gray-400 mt-0.5">Driver lain</span>
+                                <span className="text-[10px] text-gray-400 mt-0.5">{t('schedule.otherDriver')}</span>
                               )}
                             </div>
                           </td>
@@ -769,28 +743,28 @@ function JadwalPerjalanan() {
                             </svg>
                             <span className="font-medium text-gray-800">{formatDate(schedule.departureDate)}</span>
                             <span className="text-gray-400">•</span>
-                            <span className="text-gray-600">{formatTime(schedule.departureTime)} WIB</span>
+                            <span className="text-gray-600">{formatTime(schedule.departureTime)} {t('common.timezone', 'WIB')}</span>
                           </div>
                         </div>
 
                         {/* Details Grid */}
                         <div className="grid grid-cols-2 gap-3 mb-3 text-xs">
                           <div>
-                            <span className="text-gray-500 block mb-1">Kendaraan:</span>
+                            <span className="text-gray-500 block mb-1">{t('schedule.vehicleLabel', 'Armada:')}</span>
                             <p className="font-medium text-gray-800">{schedule.vehicle.vehicleType}</p>
                             <p className="text-gray-500">{schedule.vehicle.plateNumber}</p>
                           </div>
                           <div>
-                            <span className="text-gray-500 block mb-1">Driver:</span>
+                            <span className="text-gray-500 block mb-1">{t('schedule.driverLabel', 'Driver:')}</span>
                             <p className="font-medium text-gray-800">{schedule.driver.user.name}</p>
                             <p className="text-gray-500">{schedule.driver.licenseNumber}</p>
                           </div>
                           <div className="col-span-2 bg-blue-50/80 p-2 rounded-lg border border-blue-100 space-y-0.5 text-[11px] text-blue-800 font-medium">
-                            <div>🏢 <strong>Pool Asal:</strong> {schedule.poolOrigin || (schedule.route?.originCity?.name ? `Pool ${schedule.route.originCity.name}` : '-')}</div>
-                            <div>🏁 <strong>Pool Tujuan:</strong> {schedule.poolDestination || (schedule.route?.destinationCity?.name ? `Pool ${schedule.route.destinationCity.name}` : '-')}</div>
+                            <div>🏢 <strong>{t('schedule.poolOriginLabel', 'Pool Asal')}:</strong> {schedule.poolOrigin || (schedule.route?.originCity?.name ? `Pool ${schedule.route.originCity.name}` : '-')}</div>
+                            <div>🏁 <strong>{t('schedule.poolDestinationLabel', 'Pool Tujuan')}:</strong> {schedule.poolDestination || (schedule.route?.destinationCity?.name ? `Pool ${schedule.route.destinationCity.name}` : '-')}</div>
                           </div>
                           <div className="col-span-2">
-                            <span className="text-gray-500 block mb-1">Harga Tiket:</span>
+                            <span className="text-gray-500 block mb-1">{t('schedule.ticketPriceLabel', 'Harga Tiket:')}</span>
                             <p className="font-bold text-blue-600 text-sm">{formatCurrency(schedule.ticketPrice)}</p>
                           </div>
                         </div>
@@ -798,21 +772,21 @@ function JadwalPerjalanan() {
                         {/* Status Selector */}
                         {canDriverUpdate ? (
                           <div className="mb-3">
-                            <label className="text-[11px] font-semibold text-gray-500 block mb-1">Update Status Perjalanan:</label>
+                            <label className="text-[11px] font-semibold text-gray-500 block mb-1">{t('schedule.updateTripStatusLabel')}</label>
                             <select
                               value={schedule.status || 'SCHEDULED'}
                               onChange={(e) => handleUpdateScheduleStatus(schedule.id, e.target.value)}
                               className="w-full text-xs font-semibold border border-gray-300 rounded px-2 py-1.5 bg-white outline-none"
                             >
-                              <option value="SCHEDULED">📅 SCHEDULED (Terjadwal)</option>
-                              <option value="DEPARTED">🚌 DEPARTED (Berangkat)</option>
-                              <option value="COMPLETED">🏁 COMPLETED (Selesai)</option>
-                              <option value="CANCELLED">❌ CANCELLED (Dibatalkan)</option>
+                              <option value="SCHEDULED">📅 SCHEDULED ({t('schedule.statusScheduledText')})</option>
+                              <option value="DEPARTED">🚌 DEPARTED ({t('schedule.statusDepartedText')})</option>
+                              <option value="COMPLETED">🏁 COMPLETED ({t('schedule.statusCompletedText')})</option>
+                              <option value="CANCELLED">❌ CANCELLED ({t('schedule.statusCancelledText')})</option>
                             </select>
                           </div>
                         ) : (
                           <div className="mb-3 text-[11px] text-gray-400 italic">
-                            Status hanya dapat diubah oleh Driver bertugas ({schedule.driver.user.name}).
+                            {t('schedule.driverStatusNotice', { name: schedule.driver.user.name })}
                           </div>
                         )}
 
@@ -868,25 +842,25 @@ function JadwalPerjalanan() {
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      No
+                      {t('schedule.number')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('schedule.templateName', 'Nama Template')}
+                      {t('schedule.templateNameHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('dashboard.route')}
+                      {t('schedule.routeHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('schedule.recurringPattern', 'Pola Berulang')}
+                      {t('schedule.recurringPatternHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('schedule.departureTimeHeader', 'Jam Berangkat')}
+                      {t('schedule.departureTimeHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('schedule.vehicle')}
+                      {t('schedule.vehicleHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      {t('common.status', 'Status')}
+                      {t('schedule.statusHeader')}
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       {t('common.actions')}
@@ -897,7 +871,7 @@ function JadwalPerjalanan() {
                   {templates.length === 0 ? (
                     <tr>
                       <td colSpan="8" className="px-6 py-8 text-center text-gray-500">
-                        {t('schedule.noTemplatesYet', 'Belum ada template jadwal')}
+                        {t('schedule.noTemplatesYet')}
                       </td>
                     </tr>
                   ) : (
@@ -916,8 +890,8 @@ function JadwalPerjalanan() {
                           </div>
                           {(template.poolOrigin || template.poolDestination) && (
                             <div className="text-[11px] text-blue-700 mt-1.5 bg-blue-50/80 p-1.5 rounded-md border border-blue-100 space-y-0.5">
-                              <div>🏢 <strong>Asal:</strong> {template.poolOrigin || '-'}</div>
-                              <div>🏁 <strong>Tujuan:</strong> {template.poolDestination || '-'}</div>
+                              <div>🏢 <strong>{t('schedule.originPoolLabel')}:</strong> {template.poolOrigin || '-'}</div>
+                              <div>🏁 <strong>{t('schedule.destPoolLabel')}:</strong> {template.poolDestination || '-'}</div>
                             </div>
                           )}
                         </td>
@@ -930,7 +904,7 @@ function JadwalPerjalanan() {
                           )}
                         </td>
                         <td className="px-6 py-4 text-sm text-gray-800">
-                          {formatTime(template.departureTime)} WIB
+                          {formatTime(template.departureTime)} {t('common.timezone')}
                         </td>
                         <td className="px-6 py-4">
                           <div className="text-sm text-gray-800">{template.vehicle.vehicleType}</div>
@@ -940,7 +914,7 @@ function JadwalPerjalanan() {
                           <span className={`inline-block px-3 py-1 text-xs font-semibold rounded-full ${
                             template.isActive ? 'text-green-600 bg-green-50' : 'text-gray-600 bg-gray-50'
                           }`}>
-                            {template.isActive ? t('common.active', 'Aktif') : t('common.inactive', 'Nonaktif')}
+                            {template.isActive ? t('common.active') : t('common.inactive')}
                           </span>
                         </td>
                         <td className="px-6 py-4 text-sm">
@@ -977,81 +951,7 @@ function JadwalPerjalanan() {
         </div>
       )}
 
-      {/* Sync Modal */}
-      {showSyncModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl shadow-2xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-bold text-gray-800">{t('schedule.syncTitle', 'Sinkronisasi Jadwal')}</h2>
-            </div>
 
-            <div className="p-6">
-              <p className="text-gray-600 mb-6">
-                {t('schedule.syncDescription', 'Sistem akan membuat jadwal otomatis dari template yang aktif. Pilih periode waktu:')}
-              </p>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg mb-4">
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <button
-                  onClick={() => handleSyncSchedules(7)}
-                  disabled={syncing}
-                  className="w-full px-6 py-4 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {syncing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      {t('common.processing', 'Memproses...')}
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {t('schedule.sync7Days', '7 Hari Ke Depan')}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => handleSyncSchedules(30)}
-                  disabled={syncing}
-                  className="w-full px-6 py-4 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center"
-                >
-                  {syncing ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-2"></div>
-                      {t('common.processing', 'Memproses...')}
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      {t('schedule.sync30Days', '30 Hari Ke Depan')}
-                    </>
-                  )}
-                </button>
-
-                <button
-                  onClick={() => {
-                    setShowSyncModal(false);
-                    setError('');
-                  }}
-                  disabled={syncing}
-                  className="w-full px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {t('common.cancel')}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Modal */}
       {showModal && (
@@ -1060,8 +960,8 @@ function JadwalPerjalanan() {
             <div className="px-6 py-4 border-b border-gray-200 sticky top-0 bg-white">
               <h2 className="text-xl font-bold text-gray-800">
                 {editMode 
-                  ? (currentSchedule.isTemplate ? t('schedule.editTemplate', 'Edit Template') : t('schedule.editSchedule'))
-                  : (currentSchedule.isTemplate ? t('schedule.addTemplate', 'Tambah Template') : t('schedule.addSchedule'))
+                  ? (currentSchedule.isTemplate ? t('schedule.editTemplate') : t('schedule.editSchedule'))
+                  : (currentSchedule.isTemplate ? t('schedule.addTemplate') : t('schedule.addSchedule'))
                 }
               </h2>
             </div>
@@ -1078,7 +978,7 @@ function JadwalPerjalanan() {
                 {currentSchedule.isTemplate && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('schedule.templateName', 'Nama Template')} *
+                      {t('schedule.templateName')} *
                     </label>
                     <input
                       type="text"
@@ -1086,7 +986,7 @@ function JadwalPerjalanan() {
                       onChange={(e) => setCurrentSchedule({ ...currentSchedule, templateName: e.target.value })}
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                      placeholder={t('schedule.templateNamePlaceholder', 'Contoh: Jadwal Harian Jakarta-Bandung')}
+                      placeholder={t('schedule.templateNamePlaceholder')}
                     />
                   </div>
                 )}
@@ -1150,28 +1050,34 @@ function JadwalPerjalanan() {
 
                 {/* Recurring Type (only for templates) */}
                 {currentSchedule.isTemplate && (
-                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('schedule.recurringPattern', 'Pola Berulang')} *
-                    </label>
+                  <>
+                    <div className="md:col-span-2 p-3 bg-blue-50 border border-blue-200 rounded-lg text-xs text-blue-800 flex items-center gap-2">
+                      <span className="text-base">✨</span>
+                      <span>{t('schedule.autoGenerateNotice')}</span>
+                    </div>
+                    <div className="md:col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        {t('schedule.recurringPattern')} *
+                      </label>
                     <select
                       value={currentSchedule.recurringType}
                       onChange={(e) => setCurrentSchedule({ ...currentSchedule, recurringType: e.target.value, recurringDays: e.target.value === 'WEEKLY' ? currentSchedule.recurringDays : [] })}
                       required
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
                     >
-                      <option value="DAILY">{t('schedule.daily', 'Setiap Hari')}</option>
-                      <option value="WEEKLY">{t('schedule.weekly', 'Mingguan (Pilih Hari)')}</option>
-                      <option value="MONTHLY">{t('schedule.monthly', 'Bulanan')}</option>
+                      <option value="DAILY">{t('schedule.daily')}</option>
+                      <option value="WEEKLY">{t('schedule.weekly')}</option>
+                      <option value="MONTHLY">{t('schedule.monthly')}</option>
                     </select>
                   </div>
+                  </>
                 )}
 
                 {/* Recurring Days (only for WEEKLY templates) */}
                 {currentSchedule.isTemplate && currentSchedule.recurringType === 'WEEKLY' && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                      {t('schedule.selectOperationalDays', 'Pilih Hari Operasional')} *
+                      {t('schedule.selectOperationalDays')} *
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {[0, 1, 2, 3, 4, 5, 6].map((day) => (
@@ -1190,7 +1096,7 @@ function JadwalPerjalanan() {
                       ))}
                     </div>
                     {currentSchedule.recurringDays.length === 0 && (
-                      <p className="text-sm text-red-600 mt-1">{t('schedule.selectAtLeast1Day', 'Pilih minimal 1 hari')}</p>
+                      <p className="text-sm text-red-600 mt-1">{t('schedule.selectAtLeast1Day')}</p>
                     )}
                   </div>
                 )}
@@ -1235,42 +1141,42 @@ function JadwalPerjalanan() {
                     required
                     min="0"
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Contoh: 150000"
+                    placeholder={t('schedule.pricePlaceholder', 'Contoh: 150000')}
                   />
                 </div>
 
                 {/* Pool Keberangkatan (Pool Origin) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('schedule.poolOrigin', 'Pool Keberangkatan')}
+                    {t('schedule.poolOrigin')}
                   </label>
                   <input
                     type="text"
                     value={currentSchedule.poolOrigin || ''}
                     onChange={(e) => setCurrentSchedule({ ...currentSchedule, poolOrigin: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Contoh: Pool Semanggi / Lebak Bulus"
+                    placeholder={t('schedule.poolOriginPlaceholder')}
                   />
                 </div>
 
                 {/* Pool Tujuan (Pool Destination) */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('schedule.poolDestination', 'Pool Tujuan')}
+                    {t('schedule.poolDestination')}
                   </label>
                   <input
                     type="text"
                     value={currentSchedule.poolDestination || ''}
                     onChange={(e) => setCurrentSchedule({ ...currentSchedule, poolDestination: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                    placeholder="Contoh: Pool Pasteur / Dipatiukur"
+                    placeholder={t('schedule.poolDestinationPlaceholder')}
                   />
                 </div>
 
                 {/* URL Photo Representasi Jadwal */}
                 <div className="md:col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    {t('schedule.schedulePhotoUrl', 'URL Photo Representasi (Opsional)')}
+                    {t('schedule.schedulePhotoUrl')}
                   </label>
                   <input
                     type="url"
@@ -1280,7 +1186,7 @@ function JadwalPerjalanan() {
                     placeholder="https://images.unsplash.com/photo-..."
                   />
                   <p className="text-xs text-gray-500 mt-1">
-                    Jika dikosongkan, sistem akan menggunakan gambar foto bawaan (fallback).
+                    {t('schedule.imageTip')}
                   </p>
                 </div>
               </div>

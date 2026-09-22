@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { ensureSchedulesForDateRange } = require('../utils/scheduleAutoGenerator');
 
 const prisma = new PrismaClient();
 
@@ -391,6 +392,12 @@ const createTemplate = async (req, res) => {
       }
     });
 
+    // Auto-generate schedules for the next 30 days immediately
+    const today = new Date();
+    const thirtyDaysLater = new Date(today);
+    thirtyDaysLater.setDate(today.getDate() + 30);
+    await ensureSchedulesForDateRange(today, thirtyDaysLater);
+
     res.status(201).json({
       success: true,
       message: 'Template berhasil dibuat',
@@ -479,6 +486,12 @@ const updateTemplate = async (req, res) => {
         }
       }
     });
+
+    // Auto-generate schedules for the next 30 days immediately on update
+    const today = new Date();
+    const thirtyDaysLater = new Date(today);
+    thirtyDaysLater.setDate(today.getDate() + 30);
+    await ensureSchedulesForDateRange(today, thirtyDaysLater);
 
     res.json({
       success: true,
