@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { ensureSchedulesForDateRange } = require('../utils/scheduleAutoGenerator');
+const { getLocalDateBounds } = require('../utils/dateUtils');
 const prisma = new PrismaClient();
 
 // Get all schedules with relations
@@ -24,13 +25,10 @@ const getSchedules = async (req, res) => {
     
     // Filter by date if provided
     if (date) {
-      const searchDate = new Date(date);
-      const nextDay = new Date(searchDate);
-      nextDay.setDate(nextDay.getDate() + 1);
-      
+      const { start: searchStart, end: searchEnd } = getLocalDateBounds(date);
       where.departureDate = {
-        gte: searchDate,
-        lt: nextDay
+        gte: searchStart,
+        lte: searchEnd
       };
     }
     

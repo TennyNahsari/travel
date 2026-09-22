@@ -1,4 +1,5 @@
 const { PrismaClient } = require('@prisma/client');
+const { getLocalDateBounds } = require('./dateUtils');
 const prisma = new PrismaClient();
 
 // Helper: Check if should generate for this date based on recurring type
@@ -26,10 +27,7 @@ function shouldGenerateForDate(template, date) {
 
 // Helper: Check if schedule already exists
 async function checkScheduleExists(template, date) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  const { start: startOfDay, end: endOfDay } = getLocalDateBounds(date);
 
   const existing = await prisma.schedule.findFirst({
     where: {
@@ -49,10 +47,7 @@ async function checkScheduleExists(template, date) {
 
 // Helper: Check vehicle & driver availability
 async function checkAvailability(template, date) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
+  const { start: startOfDay, end: endOfDay } = getLocalDateBounds(date);
 
   const conflictingSchedule = await prisma.schedule.findFirst({
     where: {
@@ -88,18 +83,14 @@ async function checkAvailability(template, date) {
  */
 async function ensureSchedulesForDateRange(startDateInput, endDateInput) {
   try {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { start: today } = getLocalDateBounds();
+    const { start: startInput } = startDateInput ? getLocalDateBounds(startDateInput) : { start: today };
+    const effectiveStart = startInput < today ? today : startInput;
 
-    const start = startDateInput ? new Date(startDateInput) : new Date(today);
-    start.setHours(0, 0, 0, 0);
-
-    const effectiveStart = start < today ? today : start;
-
-    const end = endDateInput ? new Date(endDateInput) : new Date(effectiveStart);
-    if (!endDateInput || end <= effectiveStart) {
-      end.setDate(effectiveStart.getDate() + 14);
-    }
+    const { end: endInput } = endDateInput ? getLocalDateBounds(endDateInput) : { end: new Date(effectiveStart.getTime() + 14 * 86400000) };
+    const end = (!endDateInput || endInput <= effectiveStart)
+      ? new Date(effectiveStart.getTime() + 14 * 86400000)
+      : endInput;
     end.setHours(23, 59, 59, 999);
 
     const templates = await prisma.schedule.findMany({

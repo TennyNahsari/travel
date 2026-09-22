@@ -1,5 +1,6 @@
 const { PrismaClient } = require('@prisma/client');
 const { ensureSchedulesForDateRange } = require('../utils/scheduleAutoGenerator');
+const { getLocalDateBounds } = require('../utils/dateUtils');
 const prisma = new PrismaClient();
 
 // Generate booking code
@@ -602,8 +603,7 @@ const getAvailableSchedules = async (req, res) => {
       await ensureSchedulesForDateRange(today, fourteenDaysLater);
     }
 
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
+    const { start: startOfToday } = getLocalDateBounds();
 
     const where = {
       isTemplate: false,
@@ -614,14 +614,13 @@ const getAvailableSchedules = async (req, res) => {
     };
     
     if (date) {
-      const searchDate = new Date(date);
-      const effectiveStartDate = searchDate < startOfToday ? startOfToday : searchDate;
-      const nextDay = new Date(effectiveStartDate);
-      nextDay.setDate(nextDay.getDate() + 1);
+      const { start: searchStart, end: searchEnd } = getLocalDateBounds(date);
+      const effectiveStart = searchStart < startOfToday ? startOfToday : searchStart;
+      const effectiveEnd = searchStart < startOfToday ? getLocalDateBounds().end : searchEnd;
       
       where.departureDate = {
-        gte: effectiveStartDate,
-        lt: nextDay
+        gte: effectiveStart,
+        lte: effectiveEnd
       };
     } else {
       // Show today's and future schedules
